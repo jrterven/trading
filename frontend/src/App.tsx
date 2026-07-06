@@ -41,6 +41,8 @@ function initialEnd() {
 
 type WorkspaceTab = 'news' | 'results' | 'strategy' | 'portfolio';
 
+const SENTIMENT_ARTICLE_LIMIT = 20;
+
 export default function App() {
   const [symbol, setSymbol] = useState('AAPL');
   const [timeframe, setTimeframe] = useState('1Day');
@@ -147,10 +149,11 @@ export default function App() {
     try {
       const articles = news.length ? news : await api.fetchNews({ symbol, start, end, include_rss: false, limit: 50 });
       setNews(articles);
+      const articlesToScore = articles.slice(0, SENTIMENT_ARTICLE_LIMIT);
       const scores = await api.runSentiment({
         symbol,
-        article_ids: articles.map((article) => article.id),
-        use_ollama: true,
+        article_ids: articlesToScore.map((article) => article.id),
+        use_ollama: false,
       });
       setSentiment(scores);
     } catch (err) {

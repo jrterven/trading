@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import time
 from datetime import datetime
 from typing import Any
 
@@ -48,6 +50,10 @@ NEGATIVE_WORDS = {
     "cae",
 }
 
+OLLAMA_BULK_LIMIT = 5
+
+logger = logging.getLogger(__name__)
+
 
 class SentimentService:
     def __init__(self, settings: Settings | None = None) -> None:
@@ -62,11 +68,45 @@ class SentimentService:
         use_ollama: bool = True,
     ) -> list[SentimentScore]:
         articles = self._load_articles(symbol, article_ids)
+        started_at = time.monotonic()
+        logger.info(
+            "sentiment_start symbol=%s articles=%s use_ollama=%s ollama_model=%s",
+            symbol.upper(),
+            len(articles),
+            use_ollama,
+            self.settings.ollama_model,
+        )
         scores: list[SentimentScore] = []
-        for article in articles:
-            score = await self.score_article(article, use_ollama=use_ollama)
+        for index, article in enumerate(articles, start=1):
+            article_started_at = time.monotonic()
+            use_ollama_for_article = use_ollama and index <= OLLAMA_BULK_LIMIT
+            if use_ollama and index == OLLAMA_BULK_LIMIT + 1:
+                logger.info(
+                    "ollama_bulk_limit_reached symbol=%s total_articles=%s limit=%s",
+                    symbol.upper(),
+                    len(articles),
+                    OLLAMA_BULK_LIMIT,
+                )
+            score = await self.score_article(article, use_ollama=use_ollama_for_article)
             scores.append(score)
+            logger.info(
+                "sentiment_article_done symbol=%s index=%s/%s article_id=%s label=%s score=%.3f model=%s elapsed=%.2fs",
+                article.symbol,
+                index,
+                len(articles),
+                article.id,
+                score.label,
+                score.score,
+                score.model,
+                time.monotonic() - article_started_at,
+            )
         self.save_scores(scores)
+        logger.info(
+            "sentiment_done symbol=%s scores=%s elapsed=%.2fs",
+            symbol.upper(),
+            len(scores),
+            time.monotonic() - started_at,
+        )
         return scores
 
     async def score_article(self, article: NewsArticle, use_ollama: bool = True) -> SentimentScore:
@@ -204,6 +244,7 @@ class SentimentService:
         except Exception as exc:  # pragma: no cover - optional dependency/model download
             self._pipeline_error = str(exc)
             self._pipeline = None
+            logger.info("finbert_unavailable fallback=lexicon reason=%s", exc)
         return self._pipeline
 
     @staticmethod
@@ -222,14 +263,15 @@ class SentimentService:
         }
 
     async def _ollama_summary(self, article: NewsArticle, label: str) -> str | None:
+        article_text = " ".join(str(article.summary or article.content or "").split())[:1200]
         prompt = (
             "Resume en una frase el catalizador principal de esta noticia financiera y "
             "di por que el sentimiento podria ser relevante para trading. "
             f"Ticker: {article.symbol}. Sentimiento base: {label}. "
-            f"Titulo: {article.headline}. Resumen: {article.summary or article.content or ''}"
+            f"Titulo: {article.headline}. Resumen: {article_text}"
         )
         try:
-            async with httpx.AsyncClient(timeout=8) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(8.0, connect=2.0)) as client:
                 response = await client.post(
                     f"{self.settings.ollama_base_url}/api/chat",
                     json={
@@ -242,9 +284,22 @@ class SentimentService:
                     },
                 )
             if response.status_code >= 400:
+                logger.warning(
+                    "ollama_summary_failed article_id=%s status=%s body=%s",
+                    article.id,
+                    response.status_code,
+                    response.text[:200],
+                )
                 return None
             content = response.json().get("message", {}).get("content")
             return str(content).strip()[:500] if content else None
-        except httpx.HTTPError:
+        except httpx.TimeoutException:
+            logger.warning(
+                "ollama_summary_timeout article_id=%s model=%s timeout_seconds=8",
+                article.id,
+                self.settings.ollama_model,
+            )
             return None
-
+        except httpx.HTTPError as exc:
+            logger.warning("ollama_summary_error article_id=%s error=%s", article.id, exc)
+            return None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -24,6 +25,8 @@ from .services.paper import PaperService
 from .services.sentiment import SentimentService
 from .services.strategies import StrategyService
 from .time_utils import parse_datetime, utc_now
+
+logging.basicConfig(level=logging.INFO)
 
 settings = get_settings()
 

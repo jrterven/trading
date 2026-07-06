@@ -89,7 +89,7 @@ class NewsFetchRequest(BaseModel):
 class SentimentRunRequest(BaseModel):
     symbol: str
     article_ids: list[str] | None = None
-    use_ollama: bool = True
+    use_ollama: bool = False
 
 
 class BacktestRequest(BaseModel):
