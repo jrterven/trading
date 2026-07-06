@@ -1,0 +1,2 @@
+"""Trading Lab backend package."""
+

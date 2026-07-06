@@ -1,0 +1,10 @@
+name: trading-lab
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - nodejs=24
+  - pip:
+      - -e .[test]
+
