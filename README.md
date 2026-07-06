@@ -1,13 +1,14 @@
 # Trading Lab
 
-Plataforma web local para investigar estrategias de trading en US stocks/ETFs con candles, noticias, sentimiento y backtesting en Python.
+Local web platform for researching trading strategies on US stocks/ETFs with candlestick data, company news, sentiment analysis, Python strategy code, and backtesting.
 
 ## Stack
 
-- Backend: FastAPI, DuckDB, pandas/numpy, proveedores Alpaca/RSS.
+- Backend: FastAPI, DuckDB, pandas/numpy, Alpaca market data and trading APIs.
 - Frontend: React, TypeScript, Vite, Lightweight Charts, Monaco Editor.
-- IA local: FinBERT opcional con `pip install -e ".[ai]"`; Ollama opcional para resumen de noticias.
-- Backtesting: motor local long-only por señales `entries/exits`, con subprocess y timeout.
+- Local AI: optional FinBERT with `pip install -e ".[ai]"`; optional Ollama for news summaries.
+- Backtesting: local long-only signal engine using `entries/exits`, executed in a subprocess with a timeout.
+- Paper trading: Alpaca Paper Trading API. Backtests do not place paper or live orders.
 
 ## Setup
 
@@ -18,43 +19,43 @@ conda activate trading-lab
 npm install
 ```
 
-Para FinBERT local:
+For local FinBERT:
 
 ```bash
 conda activate trading-lab
 pip install -e ".[ai]"
 ```
 
-Para Ollama:
+For Ollama:
 
 ```bash
 ollama pull gpt-oss:20b
 ```
 
-## Ejecutar
+## Run
 
-Recomendado:
+Recommended:
 
 ```bash
 ./scripts/start_services.sh
 ```
 
-Abre `http://127.0.0.1:5173`.
+Open `http://127.0.0.1:5173`.
 
-Para detener backend y frontend:
+To stop the backend and frontend:
 
 ```bash
 ./scripts/stop_services.sh
 ```
 
-Los scripts usan por defecto `CONDA_ENV=trading-lab`, backend en `8001` y frontend en `5173`.
-Puedes cambiarlo asi:
+The scripts default to `CONDA_ENV=trading-lab`, backend port `8001`, and frontend port `5173`.
+You can override them like this:
 
 ```bash
 BACKEND_PORT=8002 FRONTEND_PORT=5174 ./scripts/start_services.sh
 ```
 
-Manual, terminal 1:
+Manual mode, terminal 1:
 
 ```bash
 conda activate trading-lab
@@ -68,17 +69,17 @@ conda activate trading-lab
 VITE_API_URL=http://127.0.0.1:8001 VITE_WS_URL=ws://127.0.0.1:8001 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Si el backend corre en otro puerto:
+If the backend runs on a different port:
 
 ```bash
 VITE_API_URL=http://127.0.0.1:8001 VITE_WS_URL=ws://127.0.0.1:8001 npm run dev
 ```
 
-La app usa solo datos de Alpaca. Sin `ALPACA_API_KEY` y `ALPACA_SECRET_KEY`, los endpoints de mercado/noticias no generan datos ficticios.
+The app uses Alpaca data only. Without `ALPACA_API_KEY` and `ALPACA_SECRET_KEY`, market/news endpoints do not generate mock data.
 
-## Contrato De Estrategias
+## Strategy Contract
 
-El editor espera una funcion `run(ctx)`:
+The editor expects a `run(ctx)` function:
 
 ```python
 def run(ctx):
@@ -93,9 +94,10 @@ def run(ctx):
     return {"entries": entries, "exits": exits, "markers": []}
 ```
 
-`ctx.candles` es un DataFrame con `timestamp`, `open`, `high`, `low`, `close`, `volume`; `ctx.news` es una lista de noticias; `ctx.sentiment` es un DataFrame con scores por articulo.
+`ctx.candles` is a DataFrame with `timestamp`, `open`, `high`, `low`, `close`, and `volume`.
+`ctx.news` contains news articles, and `ctx.sentiment` is a DataFrame with article-level sentiment scores.
 
-## Pruebas
+## Tests
 
 ```bash
 conda activate trading-lab
@@ -104,7 +106,7 @@ npm test
 npm run build
 ```
 
-Para actualizar el entorno despues de cambios en `environment.yml`:
+To update the environment after changes to `environment.yml`:
 
 ```bash
 conda env update -f environment.yml --prune
