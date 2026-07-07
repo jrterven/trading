@@ -77,6 +77,10 @@ VITE_API_URL=http://127.0.0.1:8001 VITE_WS_URL=ws://127.0.0.1:8001 npm run dev
 
 The app uses Alpaca data only. Without `ALPACA_API_KEY` and `ALPACA_SECRET_KEY`, market/news endpoints do not generate mock data.
 
+## Local Database
+
+Trading Lab stores OHLCV, news, sentiment, backtests, and dataset coverage in DuckDB. For external analysis or ML training, see [docs/DATABASE_USAGE.md](docs/DATABASE_USAGE.md).
+
 ## Strategy Contract
 
 The editor expects a `run(ctx)` function:
