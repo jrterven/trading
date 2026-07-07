@@ -496,6 +496,29 @@ select:focus {
   color: #0f766e;
 }
 
+.ohlc-readout {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 10px;
+  color: #53645f;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.ohlc-readout span {
+  width: 100%;
+  color: #6b7a76;
+  font-size: 10px;
+  text-align: center;
+}
+
+.ohlc-readout strong {
+  color: #24302d;
+  font-size: 11px;
+}
+
 .source-badge {
   justify-self: end;
   width: max-content;

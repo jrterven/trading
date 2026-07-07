@@ -6,6 +6,7 @@ import {
   createSeriesMarkers,
   type MouseEventParams,
   type SeriesMarker,
+  type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
@@ -24,8 +25,19 @@ interface Props {
   onNewsMarkerClick?: (articleId: string) => void;
 }
 
-function toChartTime(timestamp: string): UTCTimestamp {
+function toChartTime(timestamp: string, timeframe: string): Time {
+  if (timeframe === '1Day') {
+    return dateKey(timestamp);
+  }
   return Math.floor(new Date(timestamp).getTime() / 1000) as UTCTimestamp;
+}
+
+function chartTimeKey(time: Time | undefined) {
+  if (time === undefined) return '';
+  if (typeof time === 'string' || typeof time === 'number') return String(time);
+  const month = String(time.month).padStart(2, '0');
+  const day = String(time.day).padStart(2, '0');
+  return `${time.year}-${month}-${day}`;
 }
 
 const INITIAL_VISIBLE_BARS = 140;
@@ -99,7 +111,7 @@ export function ChartPanel({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
-  const markerApiRef = useRef<{ setMarkers: (markers: SeriesMarker<UTCTimestamp>[]) => void } | null>(null);
+  const markerApiRef = useRef<{ setMarkers: (markers: SeriesMarker<Time>[]) => void } | null>(null);
   const onNewsMarkerClickRef = useRef(onNewsMarkerClick);
   const [scrollState, setScrollState] = useState({
     disabled: true,
@@ -107,6 +119,7 @@ export function ChartPanel({
     start: 0,
     windowSize: 0,
   });
+  const [hoveredBar, setHoveredBar] = useState<Bar | null>(null);
   const sources = Array.from(new Set(bars.map((bar) => bar.source).filter(Boolean)));
   const dataSource = sources.length > 1 ? 'mixed' : sources[0] ?? 'no data';
 
@@ -132,7 +145,7 @@ export function ChartPanel({
       },
       timeScale: {
         borderColor: '#ccd8d4',
-        timeVisible: true,
+        timeVisible: timeframe !== '1Day',
         secondsVisible: false,
       },
       crosshair: {
@@ -159,7 +172,7 @@ export function ChartPanel({
 
     candleSeries.setData(
       bars.map((bar) => ({
-        time: toChartTime(bar.timestamp),
+        time: toChartTime(bar.timestamp, timeframe),
         open: bar.open,
         high: bar.high,
         low: bar.low,
@@ -168,18 +181,22 @@ export function ChartPanel({
     );
     volumeSeries.setData(
       bars.map((bar) => ({
-        time: toChartTime(bar.timestamp),
+        time: toChartTime(bar.timestamp, timeframe),
         value: bar.volume,
         color: bar.close >= bar.open ? 'rgba(15, 159, 110, 0.32)' : 'rgba(214, 69, 69, 0.32)',
       })),
     );
 
     markerApiRef.current = createSeriesMarkers(candleSeries, []);
+    const barsByTime = new Map(bars.map((bar) => [String(toChartTime(bar.timestamp, timeframe)), bar]));
 
     const handleChartClick = (param: MouseEventParams) => {
       const objectId = param.hoveredInfo?.objectId ?? param.hoveredObjectId;
       if (typeof objectId !== 'string' || !objectId.startsWith('news:')) return;
       onNewsMarkerClickRef.current?.(objectId.slice('news:'.length));
+    };
+    const handleCrosshairMove = (param: MouseEventParams) => {
+      setHoveredBar(barsByTime.get(chartTimeKey(param.time)) ?? null);
     };
 
     const updateScrollState = () => {
@@ -214,15 +231,17 @@ export function ChartPanel({
     updateScrollState();
     chart.timeScale().subscribeVisibleLogicalRangeChange(updateScrollState);
     chart.subscribeClick(handleChartClick);
+    chart.subscribeCrosshairMove(handleCrosshairMove);
 
     return () => {
       chart.unsubscribeClick(handleChartClick);
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateScrollState);
       markerApiRef.current = null;
       chartRef.current = null;
       chart.remove();
     };
-  }, [bars]);
+  }, [bars, timeframe]);
 
   useEffect(() => {
     const resolvedNewsMarkers = newsMarkers
@@ -231,9 +250,9 @@ export function ChartPanel({
         barTimestamp: resolveNewsBarTimestamp(bars, marker.timestamp, timeframe),
       }))
       .filter((item): item is { marker: NewsChartMarker; barTimestamp: string } => item.barTimestamp !== null);
-    const seriesMarkers: SeriesMarker<UTCTimestamp>[] = [
+    const seriesMarkers: SeriesMarker<Time>[] = [
       ...markers.map((marker) => ({
-        time: toChartTime(marker.timestamp),
+        time: toChartTime(marker.timestamp, timeframe),
         position: marker.marker_type === 'sell' ? 'aboveBar' : 'belowBar',
         shape:
           marker.marker_type === 'sell'
@@ -243,16 +262,16 @@ export function ChartPanel({
               : 'circle',
         color: marker.color,
         text: marker.label,
-      }) satisfies SeriesMarker<UTCTimestamp>),
+      }) satisfies SeriesMarker<Time>),
       ...resolvedNewsMarkers.map(({ marker, barTimestamp }) => ({
         id: `news:${marker.article_id}`,
-        time: toChartTime(barTimestamp),
+        time: toChartTime(barTimestamp, timeframe),
         position: marker.sentiment === 'negative' ? 'belowBar' : 'aboveBar',
         shape: 'square',
         color: marker.article_id === selectedNewsId ? '#153f3a' : newsMarkerColor(marker.sentiment),
         text: marker.article_id === selectedNewsId ? 'N*' : 'N',
         size: marker.article_id === selectedNewsId ? 1.45 : 1.15,
-      }) satisfies SeriesMarker<UTCTimestamp>),
+      }) satisfies SeriesMarker<Time>),
     ];
     markerApiRef.current?.setMarkers(seriesMarkers);
   }, [bars, markers, newsMarkers, selectedNewsId, timeframe]);
@@ -297,6 +316,15 @@ export function ChartPanel({
           <p className="eyebrow">Market</p>
           <h1>{symbol}</h1>
         </div>
+        {hoveredBar && (
+          <div className="ohlc-readout">
+            <span>{timeframe === '1Day' ? dateKey(hoveredBar.timestamp) : new Date(hoveredBar.timestamp).toLocaleString('es-MX')}</span>
+            <strong>O {hoveredBar.open.toFixed(2)}</strong>
+            <strong>H {hoveredBar.high.toFixed(2)}</strong>
+            <strong>L {hoveredBar.low.toFixed(2)}</strong>
+            <strong>C {hoveredBar.close.toFixed(2)}</strong>
+          </div>
+        )}
         <div className="price-readout">
           <span>Last</span>
           <strong>{livePrice ? `$${livePrice.toFixed(2)}` : '--'}</strong>
