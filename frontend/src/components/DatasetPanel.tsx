@@ -36,6 +36,11 @@ function barForTimeframe(bars: DatasetBarCoverage[], timeframe: string) {
   return bars.find((item) => item.timeframe === timeframe) ?? { timeframe, count: 0 };
 }
 
+function sentimentCoverageText(row: DatasetSummaryRow) {
+  if (!row.has_news) return 'No news';
+  return `${row.sentiment_count}/${row.news_count} scored`;
+}
+
 export function DatasetPanel({ rows, loading, onRefresh, onSelectSymbol }: Props) {
   const [query, setQuery] = useState('');
   const filteredRows = useMemo(() => {
@@ -110,7 +115,7 @@ export function DatasetPanel({ rows, loading, onRefresh, onSelectSymbol }: Props
                     <td>
                       <DataCell
                         count={row.sentiment_count}
-                        range={`${row.sentiment_coverage_pct.toFixed(1)}% scored`}
+                        range={sentimentCoverageText(row)}
                         tone={row.has_news && row.sentiment_count < row.news_count ? 'partial' : undefined}
                       />
                     </td>
