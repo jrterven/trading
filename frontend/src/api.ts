@@ -122,6 +122,10 @@ export const api = {
     }),
   backtests: (limit = 25) => request<BacktestSummary[]>(`/api/backtests?${qs({ limit })}`),
   backtest: (id: string) => request<BacktestRun>(`/api/backtests/${id}`),
+  deleteBacktest: (id: string) =>
+    request<{ deleted: boolean; id: string }>(`/api/backtests/${id}`, {
+      method: 'DELETE',
+    }),
   strategies: (limit = 50) => request<StrategyRecord[]>(`/api/strategies?${qs({ limit })}`),
   saveStrategy: (body: { name: string; code: string }) =>
     request<StrategyRecord>('/api/strategies', {

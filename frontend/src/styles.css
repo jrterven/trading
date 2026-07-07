@@ -608,7 +608,7 @@ select:focus {
 
 .strategy-filebar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 10px 14px;
   background: #f3f8f5;
@@ -1330,28 +1330,49 @@ select:focus {
 .history-row {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(70px, 0.6fr);
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 0;
+  align-items: center;
+  border-top: 1px solid #dbe4df;
+  background: #f8faf7;
+}
+
+.history-load {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.75fr) minmax(105px, 0.9fr) minmax(72px, 0.55fr);
   gap: 8px;
   align-items: center;
   padding: 9px 12px;
   border: 0;
-  border-top: 1px solid #dbe4df;
-  background: #f8faf7;
+  background: transparent;
   color: #24302f;
   font-size: 12px;
   text-align: left;
 }
 
-.history-row strong,
-.history-row span {
+.history-load strong,
+.history-load span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.history-row:hover {
+.history-load:hover,
+.history-delete:hover {
   background: #eef5f2;
+}
+
+.history-delete {
+  width: 30px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid #dbe4df;
+  background: transparent;
+  color: #a03232;
 }
 
 .table-heading {

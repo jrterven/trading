@@ -175,6 +175,8 @@ export interface BacktestSummary {
   strategy_name: string;
   symbol: string;
   timeframe: string;
+  start_at: string;
+  end_at: string;
   status: 'completed' | 'failed';
   final_equity?: number | null;
   total_return_pct?: number | null;

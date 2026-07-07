@@ -173,6 +173,14 @@ def get_backtest(run_id: str) -> dict:
     return run.model_dump(mode="json")
 
 
+@app.delete("/api/backtests/{run_id}")
+def delete_backtest(run_id: str) -> dict:
+    service = BacktestService(settings)
+    if not service.delete(run_id):
+        raise HTTPException(status_code=404, detail="Backtest no encontrado")
+    return {"deleted": True, "id": run_id}
+
+
 @app.get("/api/strategies")
 def list_strategies(limit: int = Query(default=50, ge=1, le=200)) -> list[dict]:
     service = StrategyService(settings)

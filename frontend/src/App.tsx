@@ -12,6 +12,7 @@ import { StatusPill } from './components/StatusPill';
 import { StrategyEditor } from './components/StrategyEditor';
 import { defaultStrategy } from './defaultStrategy';
 import { toDateInput } from './lib/format';
+import { strategyExamples, type StrategyExample } from './strategyExamples';
 import type {
   BacktestRun,
   BacktestSummary,
@@ -69,7 +70,7 @@ export default function App() {
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [newsFocusRequest, setNewsFocusRequest] = useState<{ articleId: string; nonce: number } | null>(null);
   const [code, setCode] = useState(defaultStrategy);
-  const [strategyName, setStrategyName] = useState('SMA crossover');
+  const [strategyName, setStrategyName] = useState('New strategy');
   const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
   const [backtest, setBacktest] = useState<BacktestRun | null>(null);
   const [backtestHistory, setBacktestHistory] = useState<BacktestSummary[]>([]);
@@ -94,7 +95,15 @@ export default function App() {
   const [timeoutSeconds, setTimeoutSeconds] = useState(8);
   const [strategyEnvironment, setStrategyEnvironment] = useState<StrategyEnvironment | null>(null);
 
-  const markers = useMemo(() => backtest?.markers ?? [], [backtest]);
+  const markers = useMemo(() => {
+    if (!backtest) return [];
+    const runMatchesChart =
+      backtest.symbol === symbol &&
+      backtest.timeframe === timeframe &&
+      toDateInput(new Date(backtest.start_at)) === start &&
+      toDateInput(new Date(backtest.end_at)) === end;
+    return runMatchesChart ? backtest.markers : [];
+  }, [backtest, end, start, symbol, timeframe]);
   const livePrice = bars.length ? bars[bars.length - 1].close : null;
   const sentimentByArticle = useMemo(
     () => new Map(sentiment.map((score) => [score.article_id, score])),
@@ -179,7 +188,6 @@ export default function App() {
   async function loadMarket(refresh: boolean) {
     setLoading(true);
     setError(null);
-    setBacktest(null);
     try {
       const [nextBars, nextPortfolio] = await Promise.all([
         api.bars({ symbol, timeframe, start, end, refresh }),
@@ -404,10 +412,28 @@ export default function App() {
     setError(null);
     try {
       const run = await api.backtest(id);
+      setSymbol(run.symbol);
+      setTimeframe(run.timeframe);
+      setStart(toDateInput(new Date(run.start_at)));
+      setEnd(toDateInput(new Date(run.end_at)));
       setBacktest(run);
       setActiveTab('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error loading backtest');
+    }
+  }
+
+  async function deleteBacktestRun(id: string) {
+    const target = backtestHistory.find((item) => item.id === id);
+    const label = target ? `${target.strategy_name} ${target.symbol} ${target.timeframe}` : 'this backtest';
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    setError(null);
+    try {
+      await api.deleteBacktest(id);
+      setBacktestHistory((current) => current.filter((item) => item.id !== id));
+      setBacktest((current) => (current?.id === id ? null : current));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error deleting backtest');
     }
   }
 
@@ -422,6 +448,12 @@ export default function App() {
     setCode(strategy.code);
     setStrategyName(strategy.name);
     setSaveMessage(strategy.file_path ? `Loaded from ${strategy.file_path}` : 'Strategy loaded');
+  }
+
+  function loadStrategyExample(example: StrategyExample) {
+    setCode(example.code);
+    setStrategyName(example.name);
+    setSaveMessage(`Example loaded: ${example.description}`);
   }
 
   function selectNewsFromChart(articleId: string) {
@@ -549,6 +581,7 @@ export default function App() {
                 run={backtest}
                 history={backtestHistory}
                 onLoadRun={loadBacktestRun}
+                onDeleteRun={deleteBacktestRun}
                 onLoadRunCode={loadRunCode}
               />
             )}
@@ -560,6 +593,7 @@ export default function App() {
                 saving={savingStrategy}
                 saveMessage={saveMessage}
                 strategies={strategies}
+                examples={strategyExamples}
                 initialCash={initialCash}
                 positionSizeCash={positionSizeCash}
                 stopLossPct={stopLossPct}
@@ -572,6 +606,7 @@ export default function App() {
                 onRun={runBacktest}
                 onSave={saveStrategy}
                 onLoadStrategy={loadStrategy}
+                onLoadExample={loadStrategyExample}
                 onInitialCashChange={setInitialCash}
                 onPositionSizeCashChange={setPositionSizeCash}
                 onStopLossPctChange={setStopLossPct}

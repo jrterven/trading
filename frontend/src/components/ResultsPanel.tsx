@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Code2, FileText, History, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, Code2, FileText, History, TrendingUp, X } from 'lucide-react';
 
 import { formatCurrency, formatNumber, formatPercent } from '../lib/format';
 import type { BacktestRun, BacktestSummary } from '../types';
@@ -7,10 +7,11 @@ interface Props {
   run: BacktestRun | null;
   history: BacktestSummary[];
   onLoadRun: (id: string) => void;
+  onDeleteRun: (id: string) => void;
   onLoadRunCode: (run: BacktestRun) => void;
 }
 
-export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) {
+export function ResultsPanel({ run, history, onLoadRun, onDeleteRun, onLoadRunCode }: Props) {
   const metrics = run?.metrics ?? {};
   return (
     <section className="side-panel results-panel">
@@ -83,20 +84,43 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
           <span>History</span>
         </div>
         {history.map((item) => (
-          <button key={item.id} className="history-row" onClick={() => onLoadRun(item.id)}>
-            <strong>{item.strategy_name}</strong>
-            <span>
-              {item.symbol} {item.timeframe}
-            </span>
-            <span className={item.status === 'completed' ? 'positive-text' : 'negative-text'}>
-              {item.status === 'completed' ? formatPercent(item.total_return_pct) : 'failed'}
-            </span>
-          </button>
+          <div key={item.id} className="history-row">
+            <button className="history-load" onClick={() => onLoadRun(item.id)}>
+              <strong>{item.strategy_name}</strong>
+              <span>
+                {item.symbol} {item.timeframe}
+              </span>
+              <span>{formatDateRange(item.start_at, item.end_at)}</span>
+              <span className={historyReturnClass(item)}>
+                {item.status === 'completed' ? formatPercent(item.total_return_pct) : 'failed'}
+              </span>
+            </button>
+            <button className="history-delete" onClick={() => onDeleteRun(item.id)} aria-label={`Delete ${item.strategy_name}`}>
+              <X size={14} />
+            </button>
+          </div>
         ))}
         {history.length === 0 && <div className="empty-state">No saved history</div>}
       </div>
     </section>
   );
+}
+
+function historyReturnClass(item: BacktestSummary) {
+  if (item.status !== 'completed') return 'negative-text';
+  return (item.total_return_pct ?? 0) < 0 ? 'negative-text' : 'positive-text';
+}
+
+function formatDateRange(startAt: string, endAt: string) {
+  return `${formatShortDate(startAt)} - ${formatShortDate(endAt)}`;
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(value);
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const year = String(date.getUTCFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
 }
 
 function LogsDebug({ run }: { run: BacktestRun }) {

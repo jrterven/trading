@@ -209,6 +209,8 @@ class BacktestSummary(BaseModel):
     strategy_name: str
     symbol: str
     timeframe: str
+    start_at: datetime
+    end_at: datetime
     status: Literal["completed", "failed"]
     final_equity: float | None = None
     total_return_pct: float | None = None

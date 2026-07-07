@@ -1,6 +1,7 @@
 import Editor from '@monaco-editor/react';
 import { Cpu, Play, Save } from 'lucide-react';
 
+import type { StrategyExample } from '../strategyExamples';
 import type { StrategyEnvironment, StrategyRecord } from '../types';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   saving: boolean;
   saveMessage?: string | null;
   strategies: StrategyRecord[];
+  examples: StrategyExample[];
   initialCash: number;
   positionSizeCash: number;
   stopLossPct: number;
@@ -22,6 +24,7 @@ interface Props {
   onRun: () => void;
   onSave: () => void;
   onLoadStrategy: (strategy: StrategyRecord) => void;
+  onLoadExample: (example: StrategyExample) => void;
   onInitialCashChange: (value: number) => void;
   onPositionSizeCashChange: (value: number) => void;
   onStopLossPctChange: (value: number) => void;
@@ -37,6 +40,7 @@ export function StrategyEditor({
   saving,
   saveMessage,
   strategies,
+  examples,
   initialCash,
   positionSizeCash,
   stopLossPct,
@@ -49,6 +53,7 @@ export function StrategyEditor({
   onRun,
   onSave,
   onLoadStrategy,
+  onLoadExample,
   onInitialCashChange,
   onPositionSizeCashChange,
   onStopLossPctChange,
@@ -116,6 +121,23 @@ export function StrategyEditor({
             {strategies.map((strategy) => (
               <option key={strategy.id} value={strategy.id}>
                 {strategy.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Examples
+          <select
+            value=""
+            onChange={(event) => {
+              const selected = examples.find((example) => example.id === event.target.value);
+              if (selected) onLoadExample(selected);
+            }}
+          >
+            <option value="">Load example...</option>
+            {examples.map((example) => (
+              <option key={example.id} value={example.id}>
+                {example.name}
               </option>
             ))}
           </select>

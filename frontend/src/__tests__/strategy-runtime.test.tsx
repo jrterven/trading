@@ -29,6 +29,7 @@ const environment: StrategyEnvironment = {
 describe('strategy runtime UI', () => {
   it('shows runtime details and edits timeout', () => {
     const onTimeoutSecondsChange = vi.fn();
+    const onLoadExample = vi.fn();
 
     render(
       <StrategyEditor
@@ -37,6 +38,14 @@ describe('strategy runtime UI', () => {
         running={false}
         saving={false}
         strategies={[]}
+        examples={[
+          {
+            id: 'rsi',
+            name: 'RSI mean reversion',
+            description: 'Buys oversold RSI.',
+            code: 'def run(ctx): return {}',
+          },
+        ]}
         initialCash={10000}
         positionSizeCash={1000}
         stopLossPct={5}
@@ -49,6 +58,7 @@ describe('strategy runtime UI', () => {
         onRun={vi.fn()}
         onSave={vi.fn()}
         onLoadStrategy={vi.fn()}
+        onLoadExample={onLoadExample}
         onInitialCashChange={vi.fn()}
         onPositionSizeCashChange={vi.fn()}
         onStopLossPctChange={vi.fn()}
@@ -64,6 +74,10 @@ describe('strategy runtime UI', () => {
     fireEvent.change(screen.getByLabelText('Timeout (s)'), { target: { value: '30' } });
 
     expect(onTimeoutSecondsChange).toHaveBeenCalledWith(30);
+
+    fireEvent.change(screen.getByLabelText('Examples'), { target: { value: 'rsi' } });
+
+    expect(onLoadExample).toHaveBeenCalledWith(expect.objectContaining({ name: 'RSI mean reversion' }));
   });
 
   it('shows backtest logs and debug output', () => {
@@ -92,12 +106,50 @@ describe('strategy runtime UI', () => {
       created_at: '2026-01-10T00:00:00Z',
     };
 
-    render(<ResultsPanel run={run} history={[]} onLoadRun={vi.fn()} onLoadRunCode={vi.fn()} />);
+    render(<ResultsPanel run={run} history={[]} onLoadRun={vi.fn()} onDeleteRun={vi.fn()} onLoadRunCode={vi.fn()} />);
 
     fireEvent.click(screen.getByText('Logs / Debug'));
 
     expect(screen.getByText('hello from strategy')).toBeInTheDocument();
     expect(screen.getByText(/"bars": 10/)).toBeInTheDocument();
     expect(screen.getByText('timeout 30s')).toBeInTheDocument();
+  });
+
+  it('shows negative history returns in red with the backtest date range', () => {
+    const onDeleteRun = vi.fn();
+    const onLoadRun = vi.fn();
+
+    render(
+      <ResultsPanel
+        run={null}
+        history={[
+          {
+            id: 'history-1',
+            strategy_id: 'strategy-1',
+            strategy_name: 'MACD momentum',
+            symbol: 'AAPL',
+            timeframe: '1Day',
+            start_at: '2026-01-01T00:00:00Z',
+            end_at: '2026-07-01T00:00:00Z',
+            status: 'completed',
+            total_return_pct: -12.82,
+            created_at: '2026-07-01T00:00:00Z',
+          },
+        ]}
+        onLoadRun={onLoadRun}
+        onDeleteRun={onDeleteRun}
+        onLoadRunCode={vi.fn()}
+      />,
+    );
+
+    const returnCell = screen.getByText('-12.82%');
+
+    expect(screen.getByText('01/01/26 - 07/01/26')).toBeInTheDocument();
+    expect(returnCell).toHaveClass('negative-text');
+
+    fireEvent.click(screen.getByLabelText('Delete MACD momentum'));
+
+    expect(onDeleteRun).toHaveBeenCalledWith('history-1');
+    expect(onLoadRun).not.toHaveBeenCalled();
   });
 });

@@ -201,7 +201,8 @@ class BacktestService:
                 con.execute(
                     """
                     SELECT r.id, r.strategy_id, COALESCE(s.name, 'Strategy') AS strategy_name,
-                           r.symbol, r.timeframe, r.status, r.metrics_json, r.created_at
+                           r.symbol, r.timeframe, r.start_at, r.end_at, r.status,
+                           r.metrics_json, r.created_at
                     FROM backtest_runs r
                     LEFT JOIN strategies s ON s.id = r.strategy_id
                     ORDER BY r.created_at DESC
@@ -220,6 +221,8 @@ class BacktestService:
                     strategy_name=row["strategy_name"],
                     symbol=row["symbol"],
                     timeframe=row["timeframe"],
+                    start_at=row["start_at"],
+                    end_at=row["end_at"],
                     status=row["status"],
                     final_equity=metrics.get("final_equity"),
                     total_return_pct=metrics.get("total_return_pct"),
@@ -228,6 +231,26 @@ class BacktestService:
                 )
             )
         return summaries
+
+    def delete(self, run_id: str) -> bool:
+        with connection(self.settings) as con:
+            rows = rows_to_dicts(
+                con.execute(
+                    "SELECT strategy_id FROM backtest_runs WHERE id = ?",
+                    [run_id],
+                )
+            )
+            if not rows:
+                return False
+            strategy_id = rows[0]["strategy_id"]
+            con.execute("DELETE FROM trades WHERE run_id = ?", [run_id])
+            con.execute("DELETE FROM markers WHERE run_id = ?", [run_id])
+            con.execute("DELETE FROM backtest_runs WHERE id = ?", [run_id])
+            con.execute(
+                "DELETE FROM strategies WHERE id = ? AND file_path IS NULL",
+                [strategy_id],
+            )
+        return True
 
     def _store_run(
         self,

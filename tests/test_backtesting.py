@@ -118,6 +118,42 @@ def run(ctx):
 
 
 @pytest.mark.asyncio
+async def test_backtest_service_deletes_run_and_related_records():
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    bars = generate_bars("AAPL", "1Day", start, start + timedelta(days=10))
+    service = BacktestService()
+
+    async def fake_get_bars(symbol: str, timeframe: str, request_start: datetime, request_end: datetime):
+        return bars
+
+    service.market_data.get_bars = fake_get_bars  # type: ignore[method-assign]
+    code = """
+def run(ctx):
+    n = len(ctx.candles)
+    entries = [False] * n
+    exits = [False] * n
+    entries[1] = True
+    exits[3] = True
+    return {"entries": entries, "exits": exits, "markers": []}
+"""
+    run = await service.run(
+        BacktestRequest(
+            symbol="AAPL",
+            timeframe="1Day",
+            start=start,
+            end=start + timedelta(days=10),
+            code=code,
+            strategy_name="delete test",
+        )
+    )
+
+    assert service.delete(run.id) is True
+    assert service.delete(run.id) is False
+    with pytest.raises(KeyError):
+        service.get(run.id)
+
+
+@pytest.mark.asyncio
 async def test_backtest_accepts_full_python_script_with_logs_and_debug():
     start = datetime(2026, 1, 1, tzinfo=UTC)
     bars = generate_bars("AAPL", "1Day", start, start + timedelta(days=10))
