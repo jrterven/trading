@@ -351,7 +351,7 @@ select:focus {
   min-height: 0;
   align-self: stretch;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(430px, 30vw);
+  grid-template-columns: minmax(0, 1fr) 8px minmax(420px, var(--right-rail-width, 560px));
   overflow: hidden;
 }
 
@@ -370,8 +370,37 @@ select:focus {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  border-left: 1px solid #cdd8d3;
   overflow: hidden;
+}
+
+.workspace-resizer {
+  width: 8px;
+  min-width: 8px;
+  height: 100%;
+  border: 0;
+  border-left: 1px solid #cdd8d3;
+  border-right: 1px solid #cdd8d3;
+  background: #edf3f0;
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+}
+
+.workspace-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 2px;
+  height: 40px;
+  border-radius: 999px;
+  background: #91aaa3;
+  transform: translate(-50%, -50%);
+}
+
+.workspace-resizer:hover,
+.workspace-resizer:focus-visible {
+  background: #dfece7;
+  outline: none;
 }
 
 .workspace-tabs {
@@ -466,11 +495,19 @@ select:focus {
   border-bottom: 1px solid #dbe4df;
 }
 
+.panel-heading > div:first-child,
+.panel-titlebar > div:first-child {
+  min-width: 0;
+}
+
 .panel-heading h1,
 .panel-titlebar h2 {
   margin: 0;
   font-size: 19px;
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-heading .eyebrow,
@@ -571,6 +608,7 @@ select:focus {
 .editor-panel {
   display: grid;
   grid-template-rows: auto auto auto auto minmax(260px, 1fr);
+  min-width: 0;
 }
 
 .strategy-environment {
@@ -639,9 +677,9 @@ select:focus {
 
 .backtest-settings {
   display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 8px;
-  padding: 10px 14px;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 6px 8px;
+  padding: 8px 14px;
   background: #eef5f2;
   border-bottom: 1px solid #dbe4df;
 }
@@ -655,19 +693,27 @@ select:focus {
 .backtest-settings input {
   width: 100%;
   min-width: 0;
-  height: 30px;
+  height: 28px;
   font-weight: 700;
 }
 
 .editor-frame {
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .tool-buttons {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 7px;
+  min-width: max-content;
+}
+
+.primary-action span {
+  white-space: nowrap;
 }
 
 .side-panel {
@@ -1550,6 +1596,10 @@ th {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .workspace-resizer {
+    display: none;
   }
 
   .right-rail {

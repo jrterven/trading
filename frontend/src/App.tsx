@@ -1,5 +1,12 @@
 import { AlertCircle, BarChart3 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 
 import { api } from './api';
 import { ChartPanel } from './components/ChartPanel';
@@ -52,6 +59,29 @@ type NewsRelationFilter = 'all' | 'direct' | 'indirect';
 
 const NEWS_FEED_LIMIT = 10000;
 const INFLUENTIAL_NEWS_LIMIT = 12;
+const RIGHT_RAIL_STORAGE_KEY = 'trading-lab-right-rail-width';
+const DEFAULT_RIGHT_RAIL_WIDTH = 560;
+const RIGHT_RAIL_MIN_WIDTH = 420;
+const RIGHT_RAIL_MAX_WIDTH = 980;
+const MAIN_CHART_MIN_WIDTH = 520;
+
+function clampRightRailWidth(width: number) {
+  const baseWidth = Math.min(Math.max(width, RIGHT_RAIL_MIN_WIDTH), RIGHT_RAIL_MAX_WIDTH);
+  if (typeof window === 'undefined') return baseWidth;
+
+  const viewportMax = Math.max(RIGHT_RAIL_MIN_WIDTH, window.innerWidth - MAIN_CHART_MIN_WIDTH);
+  return Math.min(baseWidth, viewportMax);
+}
+
+function initialRightRailWidth() {
+  if (typeof window === 'undefined') return DEFAULT_RIGHT_RAIL_WIDTH;
+  try {
+    const stored = Number(window.localStorage.getItem(RIGHT_RAIL_STORAGE_KEY));
+    return Number.isFinite(stored) && stored > 0 ? clampRightRailWidth(stored) : DEFAULT_RIGHT_RAIL_WIDTH;
+  } catch {
+    return DEFAULT_RIGHT_RAIL_WIDTH;
+  }
+}
 
 export default function App() {
   const [symbol, setSymbol] = useState('AAPL');
@@ -94,6 +124,7 @@ export default function App() {
   const [commissionPct, setCommissionPct] = useState(0.1);
   const [timeoutSeconds, setTimeoutSeconds] = useState(8);
   const [strategyEnvironment, setStrategyEnvironment] = useState<StrategyEnvironment | null>(null);
+  const [rightRailWidth, setRightRailWidth] = useState(initialRightRailWidth);
 
   const markers = useMemo(() => {
     if (!backtest) return [];
@@ -105,6 +136,10 @@ export default function App() {
     return runMatchesChart ? backtest.markers : [];
   }, [backtest, end, start, symbol, timeframe]);
   const livePrice = bars.length ? bars[bars.length - 1].close : null;
+  const workspaceStyle = useMemo(
+    () => ({ '--right-rail-width': `${rightRailWidth}px` }) as CSSProperties,
+    [rightRailWidth],
+  );
   const sentimentByArticle = useMemo(
     () => new Map(sentiment.map((score) => [score.article_id, score])),
     [sentiment],
@@ -160,6 +195,42 @@ export default function App() {
     loadDatasetSummary();
     loadStrategyEnvironment();
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(RIGHT_RAIL_STORAGE_KEY, String(rightRailWidth));
+    } catch {
+      // Layout preferences are optional; ignore storage failures.
+    }
+  }, [rightRailWidth]);
+
+  const startWorkspaceResize = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = rightRailWidth;
+      const previousCursor = document.body.style.cursor;
+      const previousUserSelect = document.body.style.userSelect;
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        const delta = startX - moveEvent.clientX;
+        setRightRailWidth(clampRightRailWidth(startWidth + delta));
+      };
+
+      const onPointerUp = () => {
+        document.body.style.cursor = previousCursor;
+        document.body.style.userSelect = previousUserSelect;
+        window.removeEventListener('pointermove', onPointerMove);
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp, { once: true });
+    },
+    [rightRailWidth],
+  );
 
   useEffect(() => {
     loadMarket(false);
@@ -520,7 +591,7 @@ export default function App() {
         </div>
       )}
 
-      <div className="workspace">
+      <div className="workspace" style={workspaceStyle}>
         <div className="main-column">
           <ChartPanel
             bars={bars}
@@ -534,6 +605,12 @@ export default function App() {
             onNewsMarkerClick={selectNewsFromChart}
           />
         </div>
+        <button
+          className="workspace-resizer"
+          type="button"
+          aria-label="Resize chart and side panel"
+          onPointerDown={startWorkspaceResize}
+        />
         <aside className="right-rail">
           <div className="workspace-tabs" role="tablist" aria-label="Right panel">
             <TabButton active={activeTab === 'news'} onClick={() => setActiveTab('news')}>

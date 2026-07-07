@@ -79,7 +79,7 @@ export function StrategyEditor({
           </button>
           <button className="primary-action" onClick={onRun} disabled={running}>
             <Play size={16} />
-            <span>{running ? 'Corriendo' : 'Backtest'}</span>
+            <span>{running ? 'Running' : 'Backtest'}</span>
           </button>
         </div>
       </div>
