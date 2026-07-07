@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Code2, History, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, Code2, FileText, History, TrendingUp } from 'lucide-react';
 
 import { formatCurrency, formatNumber, formatPercent } from '../lib/format';
 import type { BacktestRun, BacktestSummary } from '../types';
@@ -48,6 +48,8 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
         </div>
       )}
 
+      {run && <LogsDebug run={run} />}
+
       <div className="trade-table">
         <div className="table-heading">
           <Activity size={15} />
@@ -94,6 +96,46 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
         {history.length === 0 && <div className="empty-state">No saved history</div>}
       </div>
     </section>
+  );
+}
+
+function LogsDebug({ run }: { run: BacktestRun }) {
+  const debugText = run.debug === undefined || run.debug === null ? '' : JSON.stringify(run.debug, null, 2);
+  const hasLogs = Boolean(run.stdout_text || run.stderr_text || debugText || run.runtime_seconds || run.timeout_seconds);
+  if (!hasLogs) return null;
+
+  return (
+    <details className="logs-debug">
+      <summary>
+        <FileText size={15} />
+        <span>Logs / Debug</span>
+      </summary>
+      <div className="log-meta">
+        {run.runtime_seconds !== null && run.runtime_seconds !== undefined && (
+          <span>runtime {formatNumber(run.runtime_seconds, 2)}s</span>
+        )}
+        {run.timeout_seconds && <span>timeout {run.timeout_seconds}s</span>}
+        {run.environment?.python_executable && <span title={run.environment.python_executable}>Python {run.environment.python_version}</span>}
+      </div>
+      {run.stdout_text && (
+        <LogBlock title="stdout" value={run.stdout_text} />
+      )}
+      {run.stderr_text && (
+        <LogBlock title="stderr" value={run.stderr_text} />
+      )}
+      {debugText && (
+        <LogBlock title="debug" value={debugText} />
+      )}
+    </details>
+  );
+}
+
+function LogBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="log-block">
+      <span>{title}</span>
+      <pre>{value}</pre>
+    </div>
   );
 }
 

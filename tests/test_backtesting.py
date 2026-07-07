@@ -114,6 +114,89 @@ def run(ctx):
     assert run.status == "completed"
     assert run.metrics["trade_count"] == 1
     assert len(run.trades) == 1
+    assert run.timeout_seconds is not None
+
+
+@pytest.mark.asyncio
+async def test_backtest_accepts_full_python_script_with_logs_and_debug():
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    bars = generate_bars("AAPL", "1Day", start, start + timedelta(days=10))
+    service = BacktestService()
+
+    async def fake_get_bars(symbol: str, timeframe: str, request_start: datetime, request_end: datetime):
+        return bars
+
+    service.market_data.get_bars = fake_get_bars  # type: ignore[method-assign]
+    code = """
+import numpy as np
+
+FACTOR = 2
+
+def every_other(n):
+    return np.arange(n) % FACTOR == 0
+
+def run(ctx):
+    print("strategy started")
+    n = len(ctx.candles)
+    entries = every_other(n).tolist()
+    exits = [False] * n
+    if n > 2:
+        exits[2] = True
+    return {"entries": entries, "exits": exits, "debug": {"bars": n}}
+"""
+
+    run = await service.run(
+        BacktestRequest(
+            symbol="AAPL",
+            timeframe="1Day",
+            start=start,
+            end=start + timedelta(days=10),
+            code=code,
+            strategy_name="full script",
+            timeout_seconds=30,
+        )
+    )
+
+    assert run.status == "completed"
+    assert run.stdout_text == "strategy started\n"
+    assert run.debug == {"bars": len(bars)}
+    assert run.runtime_seconds is not None
+    assert run.timeout_seconds == 30
+    assert run.environment
+    assert run.environment["python_executable"]
+
+
+@pytest.mark.asyncio
+async def test_backtest_failure_preserves_traceback_and_stdout():
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    bars = generate_bars("AAPL", "1Day", start, start + timedelta(days=3))
+    service = BacktestService()
+
+    async def fake_get_bars(symbol: str, timeframe: str, request_start: datetime, request_end: datetime):
+        return bars
+
+    service.market_data.get_bars = fake_get_bars  # type: ignore[method-assign]
+    code = """
+def run(ctx):
+    print("before failure")
+    raise ValueError("intentional failure")
+"""
+
+    run = await service.run(
+        BacktestRequest(
+            symbol="AAPL",
+            timeframe="1Day",
+            start=start,
+            end=start + timedelta(days=3),
+            code=code,
+            strategy_name="failure logs",
+        )
+    )
+
+    assert run.status == "failed"
+    assert "intentional failure" in (run.error or "")
+    assert run.stdout_text == "before failure\n"
+    assert run.runtime_seconds is not None
 
 
 @pytest.mark.asyncio

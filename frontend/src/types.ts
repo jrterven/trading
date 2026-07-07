@@ -160,6 +160,12 @@ export interface BacktestRun {
   trades: Trade[];
   markers: Marker[];
   error?: string | null;
+  stdout_text?: string | null;
+  stderr_text?: string | null;
+  debug?: unknown;
+  environment?: StrategyEnvironment | null;
+  runtime_seconds?: number | null;
+  timeout_seconds?: number | null;
   created_at: string;
 }
 
@@ -183,6 +189,22 @@ export interface StrategyRecord {
   file_path?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface StrategyPackageInfo {
+  installed: boolean;
+  version?: string | null;
+}
+
+export interface StrategyEnvironment {
+  python_executable: string;
+  python_version: string;
+  platform: string;
+  strategy_timeout_seconds: number;
+  packages: Record<string, StrategyPackageInfo>;
+  cuda_available: boolean;
+  cuda_device_count: number;
+  cuda_device_name?: string | null;
 }
 
 export interface PaperPortfolio {

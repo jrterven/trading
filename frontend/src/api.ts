@@ -8,6 +8,7 @@ import type {
   SentimentScore,
   BacktestSummary,
   StrategyRecord,
+  StrategyEnvironment,
   SymbolResult,
 } from './types';
 
@@ -100,6 +101,7 @@ export const api = {
   sentiment: (params: { symbol: string; start?: string; end?: string }) =>
     request<SentimentScore[]>(`/api/sentiment?${qs(params)}`),
   datasetSummary: () => request<DatasetSummaryRow[]>('/api/dataset/summary'),
+  strategyEnvironment: () => request<StrategyEnvironment>('/api/strategy/environment'),
   runBacktest: (body: {
     symbol: string;
     timeframe: string;
@@ -112,6 +114,7 @@ export const api = {
     position_size_cash?: number | null;
     stop_loss_pct?: number | null;
     take_profit_pct?: number | null;
+    timeout_seconds?: number | null;
   }) =>
     request<BacktestRun>('/api/backtests', {
       method: 'POST',

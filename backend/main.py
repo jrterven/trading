@@ -23,6 +23,7 @@ from .services.dataset import DatasetService
 from .services.market_data import MarketDataService
 from .services.news import NewsService
 from .services.paper import PaperService
+from .services.sandbox import strategy_environment
 from .services.sentiment import SentimentService
 from .services.strategies import StrategyService
 from .time_utils import parse_datetime, utc_now
@@ -176,6 +177,11 @@ def get_backtest(run_id: str) -> dict:
 def list_strategies(limit: int = Query(default=50, ge=1, le=200)) -> list[dict]:
     service = StrategyService(settings)
     return [item.model_dump(mode="json") for item in service.list(limit=limit)]
+
+
+@app.get("/api/strategy/environment")
+def get_strategy_environment() -> dict:
+    return strategy_environment(settings.strategy_timeout_seconds)
 
 
 @app.post("/api/strategies")

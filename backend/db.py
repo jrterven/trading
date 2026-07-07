@@ -194,6 +194,12 @@ def init_db(settings: Settings | None = None) -> None:
         _ensure_column(con, "news_articles", "available_at", "TIMESTAMP")
         _ensure_column(con, "sentiment_scores", "model_version", "TEXT")
         _ensure_column(con, "sentiment_scores", "prompt_version", "TEXT")
+        _ensure_column(con, "backtest_runs", "stdout_text", "TEXT")
+        _ensure_column(con, "backtest_runs", "stderr_text", "TEXT")
+        _ensure_column(con, "backtest_runs", "debug_json", "TEXT")
+        _ensure_column(con, "backtest_runs", "environment_json", "TEXT")
+        _ensure_column(con, "backtest_runs", "runtime_seconds", "DOUBLE")
+        _ensure_column(con, "backtest_runs", "timeout_seconds", "INTEGER")
 
 
 def _ensure_column(con: duckdb.DuckDBPyConnection, table: str, column: str, column_type: str) -> None:

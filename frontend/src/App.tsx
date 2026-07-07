@@ -24,6 +24,7 @@ import type {
   NewsSortMode,
   PaperPortfolio,
   SentimentScore,
+  StrategyEnvironment,
   StrategyRecord,
 } from './types';
 
@@ -90,6 +91,8 @@ export default function App() {
   const [stopLossPct, setStopLossPct] = useState(10);
   const [takeProfitPct, setTakeProfitPct] = useState(0);
   const [commissionPct, setCommissionPct] = useState(0.1);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(8);
+  const [strategyEnvironment, setStrategyEnvironment] = useState<StrategyEnvironment | null>(null);
 
   const markers = useMemo(() => backtest?.markers ?? [], [backtest]);
   const livePrice = bars.length ? bars[bars.length - 1].close : null;
@@ -146,6 +149,7 @@ export default function App() {
     loadStrategies();
     loadBacktestHistory();
     loadDatasetSummary();
+    loadStrategyEnvironment();
   }, []);
 
   useEffect(() => {
@@ -321,6 +325,7 @@ export default function App() {
         position_size_cash: positionSizeCash > 0 ? positionSizeCash : null,
         stop_loss_pct: stopLossPct > 0 ? stopLossPct : null,
         take_profit_pct: takeProfitPct > 0 ? takeProfitPct : null,
+        timeout_seconds: Math.min(300, Math.max(1, Math.round(timeoutSeconds || 8))),
       });
       setBacktest(run);
       setBacktestHistory(await api.backtests());
@@ -382,6 +387,16 @@ export default function App() {
       setError(err instanceof Error ? err.message : 'Error loading dataset summary');
     } finally {
       setDatasetLoading(false);
+    }
+  }
+
+  async function loadStrategyEnvironment() {
+    try {
+      const environment = await api.strategyEnvironment();
+      setStrategyEnvironment(environment);
+      setTimeoutSeconds(environment.strategy_timeout_seconds);
+    } catch {
+      setStrategyEnvironment(null);
     }
   }
 
@@ -550,6 +565,8 @@ export default function App() {
                 stopLossPct={stopLossPct}
                 takeProfitPct={takeProfitPct}
                 commissionPct={commissionPct}
+                timeoutSeconds={timeoutSeconds}
+                environment={strategyEnvironment}
                 onStrategyNameChange={setStrategyName}
                 onChange={setCode}
                 onRun={runBacktest}
@@ -560,6 +577,7 @@ export default function App() {
                 onStopLossPctChange={setStopLossPct}
                 onTakeProfitPctChange={setTakeProfitPct}
                 onCommissionPctChange={setCommissionPct}
+                onTimeoutSecondsChange={setTimeoutSeconds}
               />
             )}
             {activeTab === 'portfolio' && <PaperPanel symbol={symbol} portfolio={portfolio} onOrder={placeOrder} />}

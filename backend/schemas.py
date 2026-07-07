@@ -174,6 +174,7 @@ class BacktestRequest(BaseModel):
     position_size_cash: float | None = Field(default=None, gt=0)
     stop_loss_pct: float | None = Field(default=None, ge=0, le=100)
     take_profit_pct: float | None = Field(default=None, ge=0, le=100)
+    timeout_seconds: int | None = Field(default=None, ge=1, le=300)
 
 
 class BacktestRun(BaseModel):
@@ -193,6 +194,12 @@ class BacktestRun(BaseModel):
     trades: list[Trade] = Field(default_factory=list)
     markers: list[Marker] = Field(default_factory=list)
     error: str | None = None
+    stdout_text: str | None = None
+    stderr_text: str | None = None
+    debug: Any | None = None
+    environment: dict[str, Any] | None = None
+    runtime_seconds: float | None = None
+    timeout_seconds: int | None = None
     created_at: datetime
 
 
@@ -221,6 +228,22 @@ class StrategyRecord(BaseModel):
     file_path: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class StrategyPackageInfo(BaseModel):
+    installed: bool
+    version: str | None = None
+
+
+class StrategyEnvironment(BaseModel):
+    python_executable: str
+    python_version: str
+    platform: str
+    strategy_timeout_seconds: int
+    packages: dict[str, StrategyPackageInfo]
+    cuda_available: bool
+    cuda_device_count: int
+    cuda_device_name: str | None = None
 
 
 class PaperOrderRequest(BaseModel):

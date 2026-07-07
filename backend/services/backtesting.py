@@ -14,7 +14,7 @@ from ..schemas import BacktestRequest, BacktestRun, BacktestSummary, Bar, Marker
 from ..time_utils import isoformat_utc, utc_now
 from .market_data import MarketDataService
 from .news import NewsService
-from .sandbox import run_strategy_subprocess
+from .sandbox import StrategyExecutionError, run_strategy_subprocess, strategy_environment
 from .sentiment import SentimentService
 
 
@@ -45,6 +45,12 @@ class BacktestService:
 
         status = "completed"
         error = None
+        stdout_text = None
+        stderr_text = None
+        debug: Any | None = None
+        runtime_seconds = None
+        timeout_seconds = request.timeout_seconds or self.settings.strategy_timeout_seconds
+        environment = strategy_environment(timeout_seconds)
         metrics: dict[str, Any] = {}
         equity_curve: list[dict[str, Any]] = []
         trades: list[Trade] = []
@@ -57,8 +63,14 @@ class BacktestService:
             result = run_strategy_subprocess(
                 request.code,
                 payload,
-                timeout_seconds=self.settings.strategy_timeout_seconds,
+                timeout_seconds=timeout_seconds,
             )
+            stdout_text = result.get("stdout")
+            stderr_text = result.get("stderr")
+            debug = result.get("debug")
+            runtime_seconds = result.get("runtime_seconds")
+            if result.get("python_executable"):
+                environment["python_executable"] = result["python_executable"]
             simulation = simulate_long_only(
                 bars=bars,
                 entries=result.get("entries", []),
@@ -83,6 +95,15 @@ class BacktestService:
                     bars,
                 )
             )
+        except StrategyExecutionError as exc:
+            status = "failed"
+            error = str(exc)
+            stdout_text = exc.stdout_text
+            stderr_text = exc.stderr_text
+            debug = exc.debug
+            runtime_seconds = exc.runtime_seconds
+            if exc.python_executable:
+                environment["python_executable"] = exc.python_executable
         except Exception as exc:
             status = "failed"
             error = str(exc)
@@ -97,6 +118,12 @@ class BacktestService:
             trades=trades,
             markers=markers,
             error=error,
+            stdout_text=stdout_text,
+            stderr_text=stderr_text,
+            debug=debug,
+            environment=environment,
+            runtime_seconds=runtime_seconds,
+            timeout_seconds=timeout_seconds,
             created_at=created_at,
         )
         return self.get(run_id)
@@ -109,7 +136,9 @@ class BacktestService:
                     SELECT r.id, r.strategy_id, s.name AS strategy_name, s.code AS strategy_code,
                            r.symbol, r.timeframe, r.start_at, r.end_at, r.status,
                            r.initial_cash, r.commission_pct, r.metrics_json, r.equity_curve_json,
-                           r.error, r.created_at
+                           r.error, r.stdout_text, r.stderr_text, r.debug_json,
+                           r.environment_json, r.runtime_seconds, r.timeout_seconds,
+                           r.created_at
                     FROM backtest_runs r
                     LEFT JOIN strategies s ON s.id = r.strategy_id
                     WHERE r.id = ?
@@ -157,6 +186,12 @@ class BacktestService:
             trades=[Trade(**trade) for trade in trade_rows],
             markers=[Marker(**marker) for marker in marker_rows],
             error=row["error"],
+            stdout_text=row["stdout_text"],
+            stderr_text=row["stderr_text"],
+            debug=json.loads(row["debug_json"]) if row["debug_json"] else None,
+            environment=json.loads(row["environment_json"]) if row["environment_json"] else None,
+            runtime_seconds=row["runtime_seconds"],
+            timeout_seconds=row["timeout_seconds"],
             created_at=row["created_at"],
         )
 
@@ -205,6 +240,12 @@ class BacktestService:
         trades: list[Trade],
         markers: list[Marker],
         error: str | None,
+        stdout_text: str | None,
+        stderr_text: str | None,
+        debug: Any | None,
+        environment: dict[str, Any] | None,
+        runtime_seconds: float | None,
+        timeout_seconds: int | None,
         created_at: datetime,
     ) -> None:
         with connection(self.settings) as con:
@@ -227,8 +268,9 @@ class BacktestService:
                 INSERT INTO backtest_runs
                 (id, strategy_id, symbol, timeframe, start_at, end_at, status,
                  initial_cash, commission_pct, metrics_json, equity_curve_json,
-                 error, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 error, stdout_text, stderr_text, debug_json, environment_json,
+                 runtime_seconds, timeout_seconds, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     run_id,
@@ -243,6 +285,12 @@ class BacktestService:
                     json.dumps(metrics),
                     json.dumps(equity_curve),
                     error,
+                    stdout_text,
+                    stderr_text,
+                    json.dumps(debug) if debug is not None else None,
+                    json.dumps(environment) if environment is not None else None,
+                    runtime_seconds,
+                    timeout_seconds,
                     as_utc_naive(created_at),
                 ],
             )

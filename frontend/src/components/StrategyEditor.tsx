@@ -1,7 +1,7 @@
 import Editor from '@monaco-editor/react';
-import { Play, Save } from 'lucide-react';
+import { Cpu, Play, Save } from 'lucide-react';
 
-import type { StrategyRecord } from '../types';
+import type { StrategyEnvironment, StrategyRecord } from '../types';
 
 interface Props {
   strategyName: string;
@@ -15,6 +15,8 @@ interface Props {
   stopLossPct: number;
   takeProfitPct: number;
   commissionPct: number;
+  timeoutSeconds: number;
+  environment: StrategyEnvironment | null;
   onStrategyNameChange: (name: string) => void;
   onChange: (code: string) => void;
   onRun: () => void;
@@ -25,6 +27,7 @@ interface Props {
   onStopLossPctChange: (value: number) => void;
   onTakeProfitPctChange: (value: number) => void;
   onCommissionPctChange: (value: number) => void;
+  onTimeoutSecondsChange: (value: number) => void;
 }
 
 export function StrategyEditor({
@@ -39,6 +42,8 @@ export function StrategyEditor({
   stopLossPct,
   takeProfitPct,
   commissionPct,
+  timeoutSeconds,
+  environment,
   onStrategyNameChange,
   onChange,
   onRun,
@@ -49,13 +54,19 @@ export function StrategyEditor({
   onStopLossPctChange,
   onTakeProfitPctChange,
   onCommissionPctChange,
+  onTimeoutSecondsChange,
 }: Props) {
+  const packageEntries = ['pandas', 'numpy', 'torch', 'transformers', 'vectorbt'].map((name) => {
+    const info = environment?.packages[name];
+    return `${name}:${info?.installed ? info.version ?? 'yes' : 'no'}`;
+  });
+
   return (
     <section className="editor-panel">
       <div className="panel-titlebar">
         <div>
           <p className="eyebrow">Python</p>
-          <h2>Strategy</h2>
+          <h2>Strategy script</h2>
         </div>
         <div className="tool-buttons">
           <button className="icon-button" onClick={onSave} disabled={saving} aria-label="Save local strategy">
@@ -66,6 +77,22 @@ export function StrategyEditor({
             <span>{running ? 'Corriendo' : 'Backtest'}</span>
           </button>
         </div>
+      </div>
+      <div className="strategy-environment">
+        <div className="env-heading">
+          <Cpu size={15} />
+          <span>Runtime</span>
+        </div>
+        {environment ? (
+          <div className="env-grid">
+            <span>Python {environment.python_version}</span>
+            <span title={environment.python_executable}>{environment.python_executable}</span>
+            <span>{environment.cuda_available ? `CUDA ${environment.cuda_device_name ?? 'available'}` : 'CUDA unavailable'}</span>
+            <span>{packageEntries.join(' · ')}</span>
+          </div>
+        ) : (
+          <div className="empty-state compact">Runtime unavailable</div>
+        )}
       </div>
       <div className="strategy-filebar">
         <label>
@@ -144,6 +171,17 @@ export function StrategyEditor({
             step="0.01"
             value={commissionPct}
             onChange={(event) => onCommissionPctChange(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          Timeout (s)
+          <input
+            type="number"
+            min="1"
+            max="300"
+            step="1"
+            value={timeoutSeconds}
+            onChange={(event) => onTimeoutSecondsChange(Number(event.target.value))}
           />
         </label>
       </div>
