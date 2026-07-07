@@ -24,13 +24,44 @@ class Context:
         try:
             import pandas as pd
             self.candles = pd.DataFrame(payload["candles"])
+            self.news = pd.DataFrame(payload.get("news", []))
             self.sentiment = pd.DataFrame(payload.get("sentiment", []))
             if not self.candles.empty and "timestamp" in self.candles:
                 self.candles["timestamp"] = pd.to_datetime(self.candles["timestamp"], utc=True)
                 self.candles = self.candles.set_index("timestamp", drop=False)
+            if not self.news.empty and "available_at" in self.news:
+                self.news["available_at"] = pd.to_datetime(self.news["available_at"], utc=True)
+            if not self.sentiment.empty and "created_at" in self.sentiment:
+                self.sentiment["created_at"] = pd.to_datetime(self.sentiment["created_at"], utc=True)
         except Exception:
             self.candles = payload["candles"]
             self.sentiment = payload.get("sentiment", [])
+
+    def news_until(self, timestamp):
+        try:
+            import pandas as pd
+            if not hasattr(self.news, "empty") or self.news.empty or "available_at" not in self.news:
+                return self.news
+            cutoff = pd.to_datetime(timestamp, utc=True)
+            return self.news[self.news["available_at"] <= cutoff]
+        except Exception:
+            return self.news
+
+    def sentiment_until(self, timestamp):
+        try:
+            available_news = self.news_until(timestamp)
+            if (
+                not hasattr(available_news, "empty")
+                or available_news.empty
+                or not hasattr(self.sentiment, "empty")
+                or self.sentiment.empty
+                or "article_id" not in self.sentiment
+            ):
+                return self.sentiment
+            article_ids = set(available_news["id"].tolist())
+            return self.sentiment[self.sentiment["article_id"].isin(article_ids)]
+        except Exception:
+            return self.sentiment
 
 
 def normalize_signal(value, n):
@@ -127,4 +158,3 @@ def run_strategy_subprocess(code: str, payload: dict[str, Any], timeout_seconds:
             return json.loads(stdout.splitlines()[-1])
         except (IndexError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"La estrategia no devolvio JSON valido: {stdout[:500]}") from exc
-

@@ -39,8 +39,44 @@ SCHEMA = (
         published_at TIMESTAMP NOT NULL,
         content TEXT,
         raw_symbols TEXT,
+        available_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL
     )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS news_article_symbols (
+        article_id TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        relation_type TEXT NOT NULL,
+        relevance_score DOUBLE NOT NULL,
+        relation_reason TEXT,
+        classifier_model TEXT NOT NULL,
+        classifier_version TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP NOT NULL
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS news_article_symbols_unique
+    ON news_article_symbols(article_id, symbol)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS news_fetch_coverage (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        start_at TIMESTAMP NOT NULL,
+        end_at TIMESTAMP NOT NULL,
+        status TEXT NOT NULL,
+        fetched_at TIMESTAMP NOT NULL,
+        params_hash TEXT NOT NULL,
+        article_count BIGINT NOT NULL,
+        error TEXT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS news_fetch_coverage_lookup
+    ON news_fetch_coverage(provider, symbol, start_at, end_at, status)
     """,
     """
     CREATE TABLE IF NOT EXISTS sentiment_scores (
@@ -53,6 +89,8 @@ SCHEMA = (
         neutral DOUBLE NOT NULL,
         negative DOUBLE NOT NULL,
         model TEXT NOT NULL,
+        model_version TEXT,
+        prompt_version TEXT,
         explanation TEXT,
         created_at TIMESTAMP NOT NULL
     )
@@ -134,6 +172,9 @@ def init_db(settings: Settings | None = None) -> None:
         for statement in SCHEMA:
             con.execute(statement)
         _ensure_column(con, "strategies", "file_path", "TEXT")
+        _ensure_column(con, "news_articles", "available_at", "TIMESTAMP")
+        _ensure_column(con, "sentiment_scores", "model_version", "TEXT")
+        _ensure_column(con, "sentiment_scores", "prompt_version", "TEXT")
 
 
 def _ensure_column(con: duckdb.DuckDBPyConnection, table: str, column: str, column_type: str) -> None:

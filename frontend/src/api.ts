@@ -2,6 +2,7 @@ import type {
   BacktestRun,
   Bar,
   NewsArticle,
+  NewsFetchResponse,
   PaperPortfolio,
   SentimentScore,
   BacktestSummary,
@@ -46,7 +47,13 @@ export const api = {
     end: string;
     refresh?: boolean;
   }) => request<Bar[]>(`/api/bars?${qs(params)}`),
-  news: (params: { symbol: string; start?: string; end?: string; limit?: number }) =>
+  news: (params: {
+    symbol: string;
+    start?: string;
+    end?: string;
+    limit?: number;
+    relation_type?: 'all' | 'direct' | 'indirect';
+  }) =>
     request<NewsArticle[]>(`/api/news?${qs(params)}`),
   fetchNews: (body: {
     symbol: string;
@@ -54,8 +61,9 @@ export const api = {
     end?: string;
     include_rss: boolean;
     limit: number;
+    relation_type?: 'all' | 'direct' | 'indirect';
   }) =>
-    request<NewsArticle[]>('/api/news/fetch', {
+    request<NewsFetchResponse>('/api/news/fetch', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -64,6 +72,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  sentiment: (params: { symbol: string; start?: string; end?: string }) =>
+    request<SentimentScore[]>(`/api/sentiment?${qs(params)}`),
   runBacktest: (body: {
     symbol: string;
     timeframe: string;

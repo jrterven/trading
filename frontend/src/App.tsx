@@ -15,7 +15,11 @@ import type {
   BacktestRun,
   BacktestSummary,
   Bar,
+  NewsChartMarker,
+  NewsChartMode,
   NewsArticle,
+  NewsFetchSummary,
+  NewsSortMode,
   PaperPortfolio,
   SentimentScore,
   StrategyRecord,
@@ -40,17 +44,27 @@ function initialEnd() {
 }
 
 type WorkspaceTab = 'news' | 'results' | 'strategy' | 'portfolio';
+type NewsRelationFilter = 'all' | 'direct' | 'indirect';
 
-const SENTIMENT_ARTICLE_LIMIT = 20;
+const NEWS_FEED_LIMIT = 2000;
+const INFLUENTIAL_NEWS_LIMIT = 12;
 
 export default function App() {
   const [symbol, setSymbol] = useState('AAPL');
   const [timeframe, setTimeframe] = useState('1Day');
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
+  const [newsStart, setNewsStart] = useState(initialStart);
+  const [newsEnd, setNewsEnd] = useState(initialEnd);
+  const [newsRelationFilter, setNewsRelationFilter] = useState<NewsRelationFilter>('all');
   const [bars, setBars] = useState<Bar[]>([]);
   const [news, setNews] = useState<NewsArticle[]>([]);
+  const [newsFetchSummary, setNewsFetchSummary] = useState<NewsFetchSummary | null>(null);
   const [sentiment, setSentiment] = useState<SentimentScore[]>([]);
+  const [newsSortMode, setNewsSortMode] = useState<NewsSortMode>('chronological');
+  const [newsChartMode, setNewsChartMode] = useState<NewsChartMode>('all');
+  const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
+  const [newsFocusRequest, setNewsFocusRequest] = useState<{ articleId: string; nonce: number } | null>(null);
   const [code, setCode] = useState(defaultStrategy);
   const [strategyName, setStrategyName] = useState('SMA crossover');
   const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
@@ -59,6 +73,7 @@ export default function App() {
   const [portfolio, setPortfolio] = useState<PaperPortfolio | null>(null);
   const [loading, setLoading] = useState(false);
   const [newsLoading, setNewsLoading] = useState(false);
+  const [newsLoadingMessage, setNewsLoadingMessage] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
@@ -74,6 +89,49 @@ export default function App() {
 
   const markers = useMemo(() => backtest?.markers ?? [], [backtest]);
   const livePrice = bars.length ? bars[bars.length - 1].close : null;
+  const sentimentByArticle = useMemo(
+    () => new Map(sentiment.map((score) => [score.article_id, score])),
+    [sentiment],
+  );
+  const sortedNews = useMemo(() => {
+    const scoreValue = (article: NewsArticle, field: 'positive' | 'negative') => {
+      const score = sentimentByArticle.get(article.id);
+      return score ? score[field] : -1;
+    };
+    return [...news].sort((a, b) => {
+      if (newsSortMode === 'positive') {
+        return scoreValue(b, 'positive') - scoreValue(a, 'positive');
+      }
+      if (newsSortMode === 'negative') {
+        return scoreValue(b, 'negative') - scoreValue(a, 'negative');
+      }
+      return new Date(a.published_at).getTime() - new Date(b.published_at).getTime();
+    });
+  }, [news, newsSortMode, sentimentByArticle]);
+  const newsChartMarkers = useMemo<NewsChartMarker[]>(() => {
+    const scored = news
+      .map((article) => {
+        const score = sentimentByArticle.get(article.id);
+        const dominantScore = score ? Math.max(score.positive, score.negative) : 0;
+        return { article, score, dominantScore };
+      })
+      .filter(({ article }) => Boolean(article.published_at));
+    const visibleBase = newsChartMode === 'influential'
+      ? [...scored]
+          .sort((a, b) => b.dominantScore - a.dominantScore)
+          .slice(0, INFLUENTIAL_NEWS_LIMIT)
+      : scored;
+    const visible = selectedNewsId && !visibleBase.some(({ article }) => article.id === selectedNewsId)
+      ? [...visibleBase, ...scored.filter(({ article }) => article.id === selectedNewsId)]
+      : visibleBase;
+    return visible.map(({ article, score, dominantScore }) => ({
+      article_id: article.id,
+      timestamp: article.published_at,
+      label: article.headline,
+      sentiment: score?.label ?? 'neutral',
+      score: dominantScore,
+    }));
+  }, [news, newsChartMode, selectedNewsId, sentimentByArticle]);
 
   useEffect(() => {
     api
@@ -87,6 +145,10 @@ export default function App() {
   useEffect(() => {
     loadMarket(false);
   }, [symbol, timeframe, start, end]);
+
+  useEffect(() => {
+    loadNewsCache();
+  }, [symbol, newsStart, newsEnd, newsRelationFilter]);
 
   useEffect(() => {
     const socket = new WebSocket(`${webSocketBaseUrl()}/ws/market/${symbol}?timeframe=1Min`);
@@ -109,13 +171,11 @@ export default function App() {
     setError(null);
     setBacktest(null);
     try {
-      const [nextBars, nextNews, nextPortfolio] = await Promise.all([
+      const [nextBars, nextPortfolio] = await Promise.all([
         api.bars({ symbol, timeframe, start, end, refresh }),
-        api.news({ symbol, start, end, limit: 50 }),
         api.portfolio(),
       ]);
       setBars(nextBars);
-      setNews(nextNews);
       setPortfolio(nextPortfolio);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error cargando datos');
@@ -124,42 +184,117 @@ export default function App() {
     }
   }
 
-  async function fetchNews() {
+  async function loadNewsCache() {
     setNewsLoading(true);
+    setNewsLoadingMessage('Cargando noticias guardadas...');
     setError(null);
     try {
-      const articles = await api.fetchNews({
-        symbol,
-        start,
-        end,
-        include_rss: false,
-        limit: 50,
-      });
-      setNews(articles);
+      const [nextNews, nextSentiment] = await Promise.all([
+        api.news({
+          symbol,
+          start: newsStart,
+          end: newsEnd,
+          limit: NEWS_FEED_LIMIT,
+          relation_type: newsRelationFilter,
+        }),
+        api.sentiment({ symbol, start: newsStart, end: newsEnd }),
+      ]);
+      setNews(nextNews);
+      setSelectedNewsId(null);
+      setNewsFetchSummary(null);
+      setSentiment(nextSentiment);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error cargando noticias');
     } finally {
       setNewsLoading(false);
+      setNewsLoadingMessage(null);
+    }
+  }
+
+  async function fetchNews() {
+    setNewsLoading(true);
+    setNewsLoadingMessage('Procesando histórico de noticias...');
+    setError(null);
+    try {
+      const result = await api.fetchNews({
+        symbol,
+        start: newsStart,
+        end: newsEnd,
+        include_rss: false,
+        limit: NEWS_FEED_LIMIT,
+        relation_type: newsRelationFilter,
+      });
+      const articles = result.articles;
+      setNews(articles);
+      setSelectedNewsId(null);
+      setNewsFetchSummary(result.summary);
+      const existingScores = await api.sentiment({ symbol, start: newsStart, end: newsEnd });
+      const existingScoreIds = new Set(existingScores.map((score) => score.article_id));
+      const articlesToScore = articles.filter((article) => !existingScoreIds.has(article.id));
+      if (articlesToScore.length) {
+        setNewsLoadingMessage(`Analizando sentimiento (${articlesToScore.length} pendientes)...`);
+        const scores = await api.runSentiment({
+          symbol,
+          article_ids: articlesToScore.map((article) => article.id),
+          use_ollama: false,
+        });
+        const scoreIds = new Set(scores.map((score) => score.article_id));
+        setSentiment((current) => [
+          ...scores,
+          ...existingScores.filter((score) => !scoreIds.has(score.article_id)),
+          ...current.filter((score) => !scoreIds.has(score.article_id)),
+        ]);
+      } else {
+        setSentiment(existingScores);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error cargando noticias');
+    } finally {
+      setNewsLoading(false);
+      setNewsLoadingMessage(null);
     }
   }
 
   async function runSentiment() {
     setNewsLoading(true);
+    setNewsLoadingMessage('Analizando sentimiento...');
     setError(null);
     try {
-      const articles = news.length ? news : await api.fetchNews({ symbol, start, end, include_rss: false, limit: 50 });
+      const articles = news.length
+        ? news
+        : (
+            await api.fetchNews({
+              symbol,
+              start: newsStart,
+              end: newsEnd,
+              include_rss: false,
+              limit: NEWS_FEED_LIMIT,
+              relation_type: newsRelationFilter,
+            })
+          ).articles;
       setNews(articles);
-      const articlesToScore = articles.slice(0, SENTIMENT_ARTICLE_LIMIT);
+      const existingScores = await api.sentiment({ symbol, start: newsStart, end: newsEnd });
+      const existingScoreIds = new Set(existingScores.map((score) => score.article_id));
+      const articlesToScore = articles.filter((article) => !existingScoreIds.has(article.id));
+      if (!articlesToScore.length) {
+        setSentiment(existingScores);
+        return;
+      }
       const scores = await api.runSentiment({
         symbol,
         article_ids: articlesToScore.map((article) => article.id),
         use_ollama: false,
       });
-      setSentiment(scores);
+      const scoreIds = new Set(scores.map((score) => score.article_id));
+      setSentiment([
+        ...scores,
+        ...existingScores.filter((score) => !scoreIds.has(score.article_id)),
+      ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error analizando sentimiento');
     } finally {
       setNewsLoading(false);
+      setNewsLoadingMessage(null);
     }
   }
 
@@ -255,6 +390,19 @@ export default function App() {
     setSaveMessage(strategy.file_path ? `Cargada desde ${strategy.file_path}` : 'Estrategia cargada');
   }
 
+  function selectNewsFromChart(articleId: string) {
+    setSelectedNewsId(articleId);
+    setActiveTab('news');
+  }
+
+  function selectNewsFromList(articleId: string) {
+    setSelectedNewsId(articleId);
+    setNewsFocusRequest((current) => ({
+      articleId,
+      nonce: (current?.nonce ?? 0) + 1,
+    }));
+  }
+
   function setPreset(days: number) {
     setStart(toDateInput(new Date(Date.now() - days * 24 * 60 * 60 * 1000)));
     setEnd(initialEnd());
@@ -304,7 +452,17 @@ export default function App() {
 
       <div className="workspace">
         <div className="main-column">
-          <ChartPanel bars={bars} markers={markers} symbol={symbol} livePrice={livePrice} />
+          <ChartPanel
+            bars={bars}
+            markers={markers}
+            newsMarkers={newsChartMarkers}
+            selectedNewsId={selectedNewsId}
+            focusNewsRequest={newsFocusRequest}
+            symbol={symbol}
+            timeframe={timeframe}
+            livePrice={livePrice}
+            onNewsMarkerClick={selectNewsFromChart}
+          />
         </div>
         <aside className="right-rail">
           <div className="workspace-tabs" role="tablist" aria-label="Panel derecho">
@@ -324,9 +482,23 @@ export default function App() {
           <div className="tab-content">
             {activeTab === 'news' && (
               <NewsPanel
-                news={news}
+                news={sortedNews}
+                fetchSummary={newsFetchSummary}
                 sentiment={sentiment}
                 loading={newsLoading}
+                loadingMessage={newsLoadingMessage}
+                sortMode={newsSortMode}
+                chartMode={newsChartMode}
+                selectedNewsId={selectedNewsId}
+                start={newsStart}
+                end={newsEnd}
+                relationFilter={newsRelationFilter}
+                onSortModeChange={setNewsSortMode}
+                onChartModeChange={setNewsChartMode}
+                onSelectNews={selectNewsFromList}
+                onStartChange={setNewsStart}
+                onEndChange={setNewsEnd}
+                onRelationFilterChange={setNewsRelationFilter}
                 onFetchNews={fetchNews}
                 onRunSentiment={runSentiment}
               />

@@ -32,8 +32,9 @@ class BacktestService:
         bars = await self.market_data.get_bars(
             request.symbol, request.timeframe, request.start, request.end
         )
-        articles = self.news.get_articles(request.symbol, request.start, request.end, limit=100)
-        scores = self.sentiment.get_scores(request.symbol)
+        effective_end = max((bar.timestamp for bar in bars), default=request.end)
+        articles = self.news.get_articles(request.symbol, request.start, effective_end, limit=100)
+        scores = self.sentiment.get_scores(request.symbol, start=request.start, end=effective_end)
         payload = {
             "symbol": request.symbol.upper(),
             "timeframe": request.timeframe,

@@ -4,18 +4,24 @@ import {
   HistogramSeries,
   createChart,
   createSeriesMarkers,
+  type MouseEventParams,
   type SeriesMarker,
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 
-import type { Bar, Marker } from '../types';
+import type { Bar, Marker, NewsChartMarker } from '../types';
 
 interface Props {
   bars: Bar[];
   markers: Marker[];
+  newsMarkers: NewsChartMarker[];
+  selectedNewsId?: string | null;
+  focusNewsRequest?: { articleId: string; nonce: number } | null;
   symbol: string;
+  timeframe: string;
   livePrice?: number | null;
+  onNewsMarkerClick?: (articleId: string) => void;
 }
 
 function toChartTime(timestamp: string): UTCTimestamp {
@@ -24,9 +30,77 @@ function toChartTime(timestamp: string): UTCTimestamp {
 
 const INITIAL_VISIBLE_BARS = 140;
 
-export function ChartPanel({ bars, markers, symbol, livePrice }: Props) {
+function newsMarkerColor(sentiment: NewsChartMarker['sentiment']) {
+  if (sentiment === 'positive') return '#0f766e';
+  if (sentiment === 'negative') return '#d64545';
+  return '#b88900';
+}
+
+function dateKey(timestamp: string) {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function dayStartMs(timestamp: string) {
+  return Date.parse(`${dateKey(timestamp)}T00:00:00.000Z`);
+}
+
+function medianBarIntervalMs(bars: Bar[]) {
+  if (bars.length < 2) return 24 * 60 * 60 * 1000;
+  const intervals = bars
+    .slice(1)
+    .map((bar, index) => new Date(bar.timestamp).getTime() - new Date(bars[index].timestamp).getTime())
+    .filter((value) => value > 0)
+    .sort((a, b) => a - b);
+  return intervals[Math.floor(intervals.length / 2)] || 24 * 60 * 60 * 1000;
+}
+
+function resolveNewsBarTimestamp(bars: Bar[], timestamp: string, timeframe: string) {
+  if (!bars.length) return null;
+  if (timeframe === '1Day') {
+    const targetDay = dayStartMs(timestamp);
+    const firstDay = dayStartMs(bars[0].timestamp);
+    const lastDay = dayStartMs(bars[bars.length - 1].timestamp);
+    if (targetDay < firstDay || targetDay > lastDay) return null;
+
+    const sameDay = bars.find((bar) => dayStartMs(bar.timestamp) === targetDay);
+    if (sameDay) return sameDay.timestamp;
+
+    const nextTradingBar = bars.find((bar) => dayStartMs(bar.timestamp) > targetDay);
+    if (!nextTradingBar) return null;
+    const dayGap = dayStartMs(nextTradingBar.timestamp) - targetDay;
+    return dayGap <= 4 * 24 * 60 * 60 * 1000 ? nextTradingBar.timestamp : null;
+  }
+
+  const target = new Date(timestamp).getTime();
+  const interval = medianBarIntervalMs(bars);
+  const tolerance = Math.max(interval * 1.5, 15 * 60 * 1000);
+  let nearest: string | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const bar of bars) {
+    const distance = Math.abs(new Date(bar.timestamp).getTime() - target);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = bar.timestamp;
+    }
+  }
+  return nearest && nearestDistance <= tolerance ? nearest : null;
+}
+
+export function ChartPanel({
+  bars,
+  markers,
+  newsMarkers,
+  selectedNewsId,
+  focusNewsRequest,
+  symbol,
+  timeframe,
+  livePrice,
+  onNewsMarkerClick,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  const markerApiRef = useRef<{ setMarkers: (markers: SeriesMarker<UTCTimestamp>[]) => void } | null>(null);
+  const onNewsMarkerClickRef = useRef(onNewsMarkerClick);
   const [scrollState, setScrollState] = useState({
     disabled: true,
     maxStart: 0,
@@ -35,6 +109,10 @@ export function ChartPanel({ bars, markers, symbol, livePrice }: Props) {
   });
   const sources = Array.from(new Set(bars.map((bar) => bar.source).filter(Boolean)));
   const dataSource = sources.length > 1 ? 'mixed' : sources[0] ?? 'sin datos';
+
+  useEffect(() => {
+    onNewsMarkerClickRef.current = onNewsMarkerClick;
+  }, [onNewsMarkerClick]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -96,19 +174,13 @@ export function ChartPanel({ bars, markers, symbol, livePrice }: Props) {
       })),
     );
 
-    const seriesMarkers: SeriesMarker<UTCTimestamp>[] = markers.map((marker) => ({
-      time: toChartTime(marker.timestamp),
-      position: marker.marker_type === 'sell' ? 'aboveBar' : 'belowBar',
-      shape:
-        marker.marker_type === 'sell'
-          ? 'arrowDown'
-          : marker.marker_type === 'buy'
-            ? 'arrowUp'
-            : 'circle',
-      color: marker.color,
-      text: marker.label,
-    }));
-    createSeriesMarkers(candleSeries, seriesMarkers);
+    markerApiRef.current = createSeriesMarkers(candleSeries, []);
+
+    const handleChartClick = (param: MouseEventParams) => {
+      const objectId = param.hoveredInfo?.objectId ?? param.hoveredObjectId;
+      if (typeof objectId !== 'string' || !objectId.startsWith('news:')) return;
+      onNewsMarkerClickRef.current?.(objectId.slice('news:'.length));
+    };
 
     const updateScrollState = () => {
       const range = chart.timeScale().getVisibleLogicalRange();
@@ -141,13 +213,74 @@ export function ChartPanel({ bars, markers, symbol, livePrice }: Props) {
     }
     updateScrollState();
     chart.timeScale().subscribeVisibleLogicalRangeChange(updateScrollState);
+    chart.subscribeClick(handleChartClick);
 
     return () => {
+      chart.unsubscribeClick(handleChartClick);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateScrollState);
+      markerApiRef.current = null;
       chartRef.current = null;
       chart.remove();
     };
-  }, [bars, markers]);
+  }, [bars]);
+
+  useEffect(() => {
+    const resolvedNewsMarkers = newsMarkers
+      .map((marker) => ({
+        marker,
+        barTimestamp: resolveNewsBarTimestamp(bars, marker.timestamp, timeframe),
+      }))
+      .filter((item): item is { marker: NewsChartMarker; barTimestamp: string } => item.barTimestamp !== null);
+    const seriesMarkers: SeriesMarker<UTCTimestamp>[] = [
+      ...markers.map((marker) => ({
+        time: toChartTime(marker.timestamp),
+        position: marker.marker_type === 'sell' ? 'aboveBar' : 'belowBar',
+        shape:
+          marker.marker_type === 'sell'
+            ? 'arrowDown'
+            : marker.marker_type === 'buy'
+              ? 'arrowUp'
+              : 'circle',
+        color: marker.color,
+        text: marker.label,
+      }) satisfies SeriesMarker<UTCTimestamp>),
+      ...resolvedNewsMarkers.map(({ marker, barTimestamp }) => ({
+        id: `news:${marker.article_id}`,
+        time: toChartTime(barTimestamp),
+        position: marker.sentiment === 'negative' ? 'belowBar' : 'aboveBar',
+        shape: 'square',
+        color: marker.article_id === selectedNewsId ? '#153f3a' : newsMarkerColor(marker.sentiment),
+        text: marker.article_id === selectedNewsId ? 'N*' : 'N',
+        size: marker.article_id === selectedNewsId ? 1.45 : 1.15,
+      }) satisfies SeriesMarker<UTCTimestamp>),
+    ];
+    markerApiRef.current?.setMarkers(seriesMarkers);
+  }, [bars, markers, newsMarkers, selectedNewsId, timeframe]);
+
+  useEffect(() => {
+    if (!chartRef.current || !focusNewsRequest || bars.length === 0) return;
+    const marker = newsMarkers.find((item) => item.article_id === focusNewsRequest.articleId);
+    if (!marker) return;
+    const resolvedTimestamp = resolveNewsBarTimestamp(bars, marker.timestamp, timeframe);
+    if (!resolvedTimestamp) return;
+    const markerTime = new Date(resolvedTimestamp).getTime();
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    bars.forEach((bar, index) => {
+      const distance = Math.abs(new Date(bar.timestamp).getTime() - markerTime);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+    const range = chartRef.current.timeScale().getVisibleLogicalRange();
+    const currentWindowSize = range ? Math.max(1, Math.round(range.to - range.from)) : 80;
+    const windowSize = Math.min(Math.max(currentWindowSize, 1), bars.length);
+    const maxFrom = Math.max(0, bars.length - windowSize);
+    const from = Math.min(maxFrom, Math.max(0, nearestIndex - Math.floor(windowSize / 2)));
+    const to = from + windowSize;
+    chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+  }, [bars, focusNewsRequest, newsMarkers, timeframe]);
 
   const handleScroll = (value: number) => {
     if (!chartRef.current || scrollState.disabled) return;

@@ -88,7 +88,8 @@ def get_news(
     symbol: str = "AAPL",
     start: str | None = None,
     end: str | None = None,
-    limit: int = Query(default=50, ge=1, le=100),
+    limit: int = Query(default=100, ge=1, le=2000),
+    relation_type: str = Query(default="all", pattern="^(all|direct|indirect)$"),
 ) -> list[dict]:
     service = NewsService(settings)
     articles = service.get_articles(
@@ -96,21 +97,23 @@ def get_news(
         start=parse_datetime(start, None) if start else None,
         end=parse_datetime(end, None) if end else None,
         limit=limit,
+        relation_type=relation_type,  # type: ignore[arg-type]
     )
     return [article.model_dump(mode="json") for article in articles]
 
 
 @app.post("/api/news/fetch")
-async def fetch_news(request: NewsFetchRequest) -> list[dict]:
+async def fetch_news(request: NewsFetchRequest) -> dict:
     service = NewsService(settings)
-    articles = await service.fetch_and_store(
+    result = await service.fetch_and_store_with_summary(
         symbol=request.symbol,
         start=request.start,
         end=request.end,
         include_rss=request.include_rss,
         limit=request.limit,
+        relation_type=request.relation_type,
     )
-    return [article.model_dump(mode="json") for article in articles]
+    return result.model_dump(mode="json")
 
 
 @app.post("/api/sentiment/run")
@@ -120,6 +123,21 @@ async def run_sentiment(request: SentimentRunRequest) -> list[dict]:
         request.symbol,
         article_ids=request.article_ids,
         use_ollama=request.use_ollama,
+    )
+    return [score.model_dump(mode="json") for score in scores]
+
+
+@app.get("/api/sentiment")
+def get_sentiment(
+    symbol: str,
+    start: str | None = None,
+    end: str | None = None,
+) -> list[dict]:
+    service = SentimentService(settings)
+    scores = service.get_scores(
+        symbol=symbol,
+        start=parse_datetime(start, None) if start else None,
+        end=parse_datetime(end, None) if end else None,
     )
     return [score.model_dump(mode="json") for score in scores]
 

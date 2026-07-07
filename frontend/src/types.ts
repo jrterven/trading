@@ -26,8 +26,31 @@ export interface NewsArticle {
   url?: string | null;
   author?: string | null;
   published_at: string;
+  available_at?: string | null;
   content?: string | null;
   raw_symbols: string[];
+  relation_type: 'direct' | 'indirect';
+  relevance_score: number;
+  relation_reason?: string | null;
+  classifier_model?: string | null;
+  classifier_version?: string | null;
+}
+
+export interface NewsFetchSummary {
+  total: number;
+  fetched: number;
+  existing: number;
+  new: number;
+  daily: {
+    max?: { date: string; count: number } | null;
+    min?: { date: string; count: number } | null;
+    average: number;
+  };
+}
+
+export interface NewsFetchResponse {
+  articles: NewsArticle[];
+  summary: NewsFetchSummary;
 }
 
 export interface SentimentScore {
@@ -40,8 +63,21 @@ export interface SentimentScore {
   neutral: number;
   negative: number;
   model: string;
+  model_version?: string | null;
+  prompt_version?: string | null;
   explanation?: string | null;
   created_at: string;
+}
+
+export type NewsSortMode = 'chronological' | 'positive' | 'negative';
+export type NewsChartMode = 'all' | 'influential';
+
+export interface NewsChartMarker {
+  article_id: string;
+  timestamp: string;
+  label: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+  score: number;
 }
 
 export interface Marker {

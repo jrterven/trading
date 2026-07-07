@@ -34,8 +34,38 @@ class NewsArticle(BaseModel):
     url: str | None = None
     author: str | None = None
     published_at: datetime
+    available_at: datetime | None = None
     content: str | None = None
     raw_symbols: list[str] = Field(default_factory=list)
+    relation_type: Literal["direct", "indirect"] = "direct"
+    relevance_score: float = 1.0
+    relation_reason: str | None = None
+    classifier_model: str | None = None
+    classifier_version: str | None = None
+
+
+class NewsFetchDayCount(BaseModel):
+    date: str
+    count: int
+
+
+class NewsFetchDailyStats(BaseModel):
+    max: NewsFetchDayCount | None = None
+    min: NewsFetchDayCount | None = None
+    average: float = 0.0
+
+
+class NewsFetchSummary(BaseModel):
+    total: int
+    fetched: int
+    existing: int
+    new: int
+    daily: NewsFetchDailyStats = Field(default_factory=NewsFetchDailyStats)
+
+
+class NewsFetchResponse(BaseModel):
+    articles: list[NewsArticle]
+    summary: NewsFetchSummary
 
 
 class SentimentScore(BaseModel):
@@ -48,6 +78,8 @@ class SentimentScore(BaseModel):
     neutral: float
     negative: float
     model: str
+    model_version: str | None = None
+    prompt_version: str | None = None
     explanation: str | None = None
     created_at: datetime
 
@@ -83,7 +115,8 @@ class NewsFetchRequest(BaseModel):
     start: datetime | None = None
     end: datetime | None = None
     include_rss: bool = False
-    limit: int = Field(default=30, ge=1, le=100)
+    limit: int = Field(default=100, ge=1, le=2000)
+    relation_type: Literal["all", "direct", "indirect"] = "all"
 
 
 class SentimentRunRequest(BaseModel):

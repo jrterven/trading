@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from backend.schemas import BacktestRequest, Bar
+from backend.schemas import BacktestRequest, Bar, NewsArticle
 from backend.sample_data import generate_bars
 from backend.services.backtesting import BacktestService
 from backend.services.backtesting import simulate_long_only
@@ -106,3 +106,67 @@ def run(ctx):
     assert run.status == "completed"
     assert run.metrics["trade_count"] == 1
     assert len(run.trades) == 1
+
+
+@pytest.mark.asyncio
+async def test_backtest_does_not_pass_news_after_last_candle_to_strategy():
+    service = BacktestService()
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    bars = [
+        Bar(
+            symbol="AAPL",
+            timeframe="1Day",
+            timestamp=start + timedelta(days=index),
+            open=100 + index,
+            high=101 + index,
+            low=99 + index,
+            close=100 + index,
+            volume=1000,
+            source="alpaca",
+        )
+        for index in range(2)
+    ]
+    service.market_data.save_bars(bars)
+    service.news.save_articles(
+        [
+            NewsArticle(
+                id="alpaca:inside",
+                source="alpaca",
+                symbol="AAPL",
+                headline="Apple reports strong growth",
+                published_at=start,
+                available_at=start,
+                raw_symbols=["AAPL"],
+            ),
+            NewsArticle(
+                id="alpaca:future",
+                source="alpaca",
+                symbol="AAPL",
+                headline="Apple future event",
+                published_at=start + timedelta(days=5),
+                available_at=start + timedelta(days=5),
+                raw_symbols=["AAPL"],
+            ),
+        ],
+        requested_symbol="AAPL",
+    )
+    code = """
+def run(ctx):
+    n = len(ctx.candles)
+    if len(ctx.news) > 0 and ctx.news["available_at"].max() > ctx.candles["timestamp"].max():
+        raise ValueError("future news leaked into backtest")
+    return {"entries": [False] * n, "exits": [False] * n, "markers": []}
+"""
+
+    run = await service.run(
+        BacktestRequest(
+            symbol="AAPL",
+            timeframe="1Day",
+            start=start,
+            end=start + timedelta(days=10),
+            code=code,
+            strategy_name="no lookahead news",
+        )
+    )
+
+    assert run.status == "completed"

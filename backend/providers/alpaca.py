@@ -96,21 +96,38 @@ class AlpacaProvider:
             return []
 
         url = f"{self.settings.alpaca_data_base_url}/v1beta1/news"
-        params: dict[str, Any] = {
-            "symbols": symbol.upper(),
-            "limit": min(limit, 50),
-            "include_content": "true",
-            "sort": "desc",
-        }
+        params: dict[str, Any] = self._news_params(symbol, limit)
         if start:
             params["start"] = isoformat_utc(start)
         if end:
             params["end"] = isoformat_utc(end)
+        articles: list[NewsArticle] = []
+        page_token: str | None = None
         async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(url, headers=self.headers, params=params)
-        if response.status_code >= 400:
-            raise ProviderError(f"Alpaca news error {response.status_code}: {response.text[:240]}")
-        return [self._news_from_alpaca(symbol.upper(), item) for item in response.json().get("news", [])]
+            for _ in range(20):
+                page_params = dict(params)
+                if page_token:
+                    page_params["page_token"] = page_token
+                response = await client.get(url, headers=self.headers, params=page_params)
+                if response.status_code >= 400:
+                    raise ProviderError(f"Alpaca news error {response.status_code}: {response.text[:240]}")
+                payload = response.json()
+                articles.extend(
+                    self._news_from_alpaca(symbol.upper(), item) for item in payload.get("news", [])
+                )
+                page_token = payload.get("next_page_token")
+                if not page_token:
+                    break
+        return articles
+
+    @staticmethod
+    def _news_params(symbol: str, limit: int) -> dict[str, Any]:
+        return {
+            "symbols": symbol.upper(),
+            "limit": min(max(limit, 1), 50),
+            "include_content": "true",
+            "sort": "desc",
+        }
 
     async def get_account(self) -> dict[str, Any]:
         if not self.settings.has_alpaca_credentials:
@@ -183,6 +200,7 @@ class AlpacaProvider:
             url=url,
             author=raw.get("author"),
             published_at=ensure_utc(published_at),
+            available_at=ensure_utc(published_at),
             content=raw.get("content"),
             raw_symbols=symbols or [symbol],
         )
