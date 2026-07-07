@@ -52,7 +52,7 @@ class BacktestService:
         try:
             if not bars:
                 raise ValueError(
-                    "No hay barras de Alpaca para el simbolo, timeframe y rango seleccionados"
+                    "No Alpaca bars found for the selected symbol, timeframe, and range"
                 )
             result = run_strategy_subprocess(
                 request.code,
@@ -165,7 +165,7 @@ class BacktestService:
             rows = rows_to_dicts(
                 con.execute(
                     """
-                    SELECT r.id, r.strategy_id, COALESCE(s.name, 'Estrategia') AS strategy_name,
+                    SELECT r.id, r.strategy_id, COALESCE(s.name, 'Strategy') AS strategy_name,
                            r.symbol, r.timeframe, r.status, r.metrics_json, r.created_at
                     FROM backtest_runs r
                     LEFT JOIN strategies s ON s.id = r.strategy_id
@@ -336,7 +336,7 @@ def simulate_long_only(
                     symbol=symbol,
                     timestamp=bar.timestamp,
                     marker_type="buy",
-                    label="Compra",
+                    label="Buy",
                     color="#0f9f6e",
                     price=price,
                     source="strategy",
@@ -346,7 +346,7 @@ def simulate_long_only(
             stop_price = entry_price * (1 - (stop_loss_pct or 0) / 100) if stop_loss_pct else None
             target_price = entry_price * (1 + (take_profit_pct or 0) / 100) if take_profit_pct else None
             exit_price = price
-            exit_label = "Venta"
+            exit_label = "Sell"
             exit_color = "#d64545"
             should_exit = False
             if stop_price is not None and bar.low <= stop_price:

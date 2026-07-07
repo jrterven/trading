@@ -22,7 +22,7 @@ export function PaperPanel({ symbol, portfolio, onOrder }: Props) {
       <div className="panel-titlebar">
         <div>
           <p className="eyebrow">Paper</p>
-          <h2>Portafolio</h2>
+          <h2>Portfolio</h2>
         </div>
         <WalletCards size={18} />
       </div>
@@ -37,11 +37,11 @@ export function PaperPanel({ symbol, portfolio, onOrder }: Props) {
         />
         <button onClick={() => onOrder('buy', safeQuantity)} disabled={safeQuantity <= 0}>
           <Send size={15} />
-          <span>Comprar {symbol}</span>
+          <span>Buy {symbol}</span>
         </button>
         <button className="secondary-action" onClick={() => onOrder('sell', safeQuantity)} disabled={safeQuantity <= 0}>
           <Send size={15} />
-          <span>Vender</span>
+          <span>Sell</span>
         </button>
       </div>
 
@@ -74,7 +74,7 @@ export function PaperPanel({ symbol, portfolio, onOrder }: Props) {
 
         {otherPositions.length > 0 && (
           <>
-            <div className="portfolio-subheading">Otras posiciones</div>
+            <div className="portfolio-subheading">Other positions</div>
             {otherPositions.map((position) => (
               <div key={position.symbol} className="position-row secondary-row">
                 <strong>{position.symbol}</strong>

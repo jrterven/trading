@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from './api';
 import { ChartPanel } from './components/ChartPanel';
 import { Controls } from './components/Controls';
+import { DatasetPanel } from './components/DatasetPanel';
 import { NewsPanel } from './components/NewsPanel';
 import { PaperPanel } from './components/PaperPanel';
 import { ResultsPanel } from './components/ResultsPanel';
@@ -15,6 +16,7 @@ import type {
   BacktestRun,
   BacktestSummary,
   Bar,
+  DatasetSummaryRow,
   NewsChartMarker,
   NewsChartMode,
   NewsArticle,
@@ -43,10 +45,10 @@ function initialEnd() {
   return toDateInput(new Date());
 }
 
-type WorkspaceTab = 'news' | 'results' | 'strategy' | 'portfolio';
+type WorkspaceTab = 'news' | 'results' | 'strategy' | 'portfolio' | 'dataset';
 type NewsRelationFilter = 'all' | 'direct' | 'indirect';
 
-const NEWS_FEED_LIMIT = 2000;
+const NEWS_FEED_LIMIT = 10000;
 const INFLUENTIAL_NEWS_LIMIT = 12;
 
 export default function App() {
@@ -62,7 +64,7 @@ export default function App() {
   const [newsFetchSummary, setNewsFetchSummary] = useState<NewsFetchSummary | null>(null);
   const [sentiment, setSentiment] = useState<SentimentScore[]>([]);
   const [newsSortMode, setNewsSortMode] = useState<NewsSortMode>('chronological');
-  const [newsChartMode, setNewsChartMode] = useState<NewsChartMode>('all');
+  const [newsChartMode, setNewsChartMode] = useState<NewsChartMode>('none');
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [newsFocusRequest, setNewsFocusRequest] = useState<{ articleId: string; nonce: number } | null>(null);
   const [code, setCode] = useState(defaultStrategy);
@@ -71,7 +73,9 @@ export default function App() {
   const [backtest, setBacktest] = useState<BacktestRun | null>(null);
   const [backtestHistory, setBacktestHistory] = useState<BacktestSummary[]>([]);
   const [portfolio, setPortfolio] = useState<PaperPortfolio | null>(null);
+  const [datasetRows, setDatasetRows] = useState<DatasetSummaryRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [datasetLoading, setDatasetLoading] = useState(false);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsLoadingMessage, setNewsLoadingMessage] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -109,6 +113,7 @@ export default function App() {
     });
   }, [news, newsSortMode, sentimentByArticle]);
   const newsChartMarkers = useMemo<NewsChartMarker[]>(() => {
+    if (newsChartMode === 'none') return [];
     const scored = news
       .map((article) => {
         const score = sentimentByArticle.get(article.id);
@@ -140,6 +145,7 @@ export default function App() {
       .catch(() => setAlpacaConfigured(false));
     loadStrategies();
     loadBacktestHistory();
+    loadDatasetSummary();
   }, []);
 
   useEffect(() => {
@@ -178,7 +184,7 @@ export default function App() {
       setBars(nextBars);
       setPortfolio(nextPortfolio);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error cargando datos');
+      setError(err instanceof Error ? err.message : 'Error loading data');
     } finally {
       setLoading(false);
     }
@@ -186,7 +192,7 @@ export default function App() {
 
   async function loadNewsCache() {
     setNewsLoading(true);
-    setNewsLoadingMessage('Cargando noticias guardadas...');
+    setNewsLoadingMessage('Loading saved news...');
     setError(null);
     try {
       const [nextNews, nextSentiment] = await Promise.all([
@@ -204,7 +210,7 @@ export default function App() {
       setNewsFetchSummary(null);
       setSentiment(nextSentiment);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error cargando noticias');
+      setError(err instanceof Error ? err.message : 'Error loading news');
     } finally {
       setNewsLoading(false);
       setNewsLoadingMessage(null);
@@ -213,7 +219,7 @@ export default function App() {
 
   async function fetchNews() {
     setNewsLoading(true);
-    setNewsLoadingMessage('Procesando histórico de noticias...');
+    setNewsLoadingMessage('Processing news, sentiment, and OHLCV history...');
     setError(null);
     try {
       const result = await api.fetchNews({
@@ -232,7 +238,7 @@ export default function App() {
       const existingScoreIds = new Set(existingScores.map((score) => score.article_id));
       const articlesToScore = articles.filter((article) => !existingScoreIds.has(article.id));
       if (articlesToScore.length) {
-        setNewsLoadingMessage(`Analizando sentimiento (${articlesToScore.length} pendientes)...`);
+        setNewsLoadingMessage(`Analyzing sentiment (${articlesToScore.length} pending)...`);
         const scores = await api.runSentiment({
           symbol,
           article_ids: articlesToScore.map((article) => article.id),
@@ -247,8 +253,9 @@ export default function App() {
       } else {
         setSentiment(existingScores);
       }
+      loadDatasetSummary();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error cargando noticias');
+      setError(err instanceof Error ? err.message : 'Error loading news');
     } finally {
       setNewsLoading(false);
       setNewsLoadingMessage(null);
@@ -257,7 +264,7 @@ export default function App() {
 
   async function runSentiment() {
     setNewsLoading(true);
-    setNewsLoadingMessage('Analizando sentimiento...');
+    setNewsLoadingMessage('Analyzing sentiment...');
     setError(null);
     try {
       const articles = news.length
@@ -291,7 +298,7 @@ export default function App() {
         ...existingScores.filter((score) => !scoreIds.has(score.article_id)),
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error analizando sentimiento');
+      setError(err instanceof Error ? err.message : 'Error analyzing sentiment');
     } finally {
       setNewsLoading(false);
       setNewsLoadingMessage(null);
@@ -308,7 +315,7 @@ export default function App() {
         start,
         end,
         code,
-        strategy_name: strategyName || `${symbol} estrategia`,
+        strategy_name: strategyName || `${symbol} strategy`,
         initial_cash: Math.max(1, initialCash || 1),
         commission_pct: Math.max(0, commissionPct || 0) / 100,
         position_size_cash: positionSizeCash > 0 ? positionSizeCash : null,
@@ -319,7 +326,7 @@ export default function App() {
       setBacktestHistory(await api.backtests());
       setActiveTab('results');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error corriendo backtest');
+      setError(err instanceof Error ? err.message : 'Error running backtest');
     } finally {
       setRunning(false);
     }
@@ -331,7 +338,7 @@ export default function App() {
       await api.paperOrder({ symbol, side, quantity });
       setPortfolio(await api.portfolio());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error en orden paper');
+      setError(err instanceof Error ? err.message : 'Error placing paper order');
     }
   }
 
@@ -340,11 +347,11 @@ export default function App() {
     setSaveMessage(null);
     setError(null);
     try {
-      const saved = await api.saveStrategy({ name: strategyName || 'Estrategia sin nombre', code });
+      const saved = await api.saveStrategy({ name: strategyName || 'Untitled strategy', code });
       setStrategies((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      setSaveMessage(saved.file_path ? `Guardada en ${saved.file_path}` : 'Estrategia guardada');
+      setSaveMessage(saved.file_path ? `Saved to ${saved.file_path}` : 'Strategy saved');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error guardando estrategia');
+      setError(err instanceof Error ? err.message : 'Error saving strategy');
     } finally {
       setSavingStrategy(false);
     }
@@ -366,6 +373,18 @@ export default function App() {
     }
   }
 
+  async function loadDatasetSummary() {
+    setDatasetLoading(true);
+    setError(null);
+    try {
+      setDatasetRows(await api.datasetSummary());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error loading dataset summary');
+    } finally {
+      setDatasetLoading(false);
+    }
+  }
+
   async function loadBacktestRun(id: string) {
     setError(null);
     try {
@@ -373,21 +392,21 @@ export default function App() {
       setBacktest(run);
       setActiveTab('results');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error cargando backtest');
+      setError(err instanceof Error ? err.message : 'Error loading backtest');
     }
   }
 
   function loadRunCode(run: BacktestRun) {
     if (!run.strategy_code) return;
     setCode(run.strategy_code);
-    setStrategyName(run.strategy_name || `${run.symbol} estrategia`);
+    setStrategyName(run.strategy_name || `${run.symbol} strategy`);
     setActiveTab('strategy');
   }
 
   function loadStrategy(strategy: StrategyRecord) {
     setCode(strategy.code);
     setStrategyName(strategy.name);
-    setSaveMessage(strategy.file_path ? `Cargada desde ${strategy.file_path}` : 'Estrategia cargada');
+    setSaveMessage(strategy.file_path ? `Loaded from ${strategy.file_path}` : 'Strategy loaded');
   }
 
   function selectNewsFromChart(articleId: string) {
@@ -401,6 +420,10 @@ export default function App() {
       articleId,
       nonce: (current?.nonce ?? 0) + 1,
     }));
+  }
+
+  function selectDatasetSymbol(nextSymbol: string) {
+    setSymbol(nextSymbol);
   }
 
   function setPreset(days: number) {
@@ -423,7 +446,7 @@ export default function App() {
           <BarChart3 size={25} />
           <div>
             <span>Trading Lab</span>
-            <small>research local</small>
+            <small>local research</small>
           </div>
         </div>
         <Controls
@@ -465,18 +488,21 @@ export default function App() {
           />
         </div>
         <aside className="right-rail">
-          <div className="workspace-tabs" role="tablist" aria-label="Panel derecho">
+          <div className="workspace-tabs" role="tablist" aria-label="Right panel">
             <TabButton active={activeTab === 'news'} onClick={() => setActiveTab('news')}>
-              Noticias
+              News
             </TabButton>
             <TabButton active={activeTab === 'results'} onClick={() => setActiveTab('results')}>
-              Resultados
+              Results
             </TabButton>
             <TabButton active={activeTab === 'strategy'} onClick={() => setActiveTab('strategy')}>
-              Estrategia
+              Strategy
             </TabButton>
             <TabButton active={activeTab === 'portfolio'} onClick={() => setActiveTab('portfolio')}>
-              Portafolio
+              Portfolio
+            </TabButton>
+            <TabButton active={activeTab === 'dataset'} onClick={() => setActiveTab('dataset')}>
+              Dataset
             </TabButton>
           </div>
           <div className="tab-content">
@@ -537,6 +563,14 @@ export default function App() {
               />
             )}
             {activeTab === 'portfolio' && <PaperPanel symbol={symbol} portfolio={portfolio} onOrder={placeOrder} />}
+            {activeTab === 'dataset' && (
+              <DatasetPanel
+                rows={datasetRows}
+                loading={datasetLoading}
+                onRefresh={loadDatasetSummary}
+                onSelectSymbol={selectDatasetSymbol}
+              />
+            )}
           </div>
         </aside>
       </div>

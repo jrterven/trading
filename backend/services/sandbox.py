@@ -74,7 +74,7 @@ def normalize_signal(value, n):
     if isinstance(value, dict):
         value = list(value.values())
     if not isinstance(value, (list, tuple)):
-        raise ValueError("entries/exits deben ser listas, Series de pandas o arrays booleanos")
+        raise ValueError("entries/exits must be lists, pandas Series, or boolean arrays")
     normalized = [bool(item) for item in value]
     if len(normalized) < n:
         normalized.extend([False] * (n - len(normalized)))
@@ -87,7 +87,7 @@ def normalize_markers(value):
     if hasattr(value, "to_dict"):
         value = value.to_dict("records")
     if not isinstance(value, list):
-        raise ValueError("markers debe ser una lista de diccionarios")
+        raise ValueError("markers must be a list of dictionaries")
     return [item for item in value if isinstance(item, dict)]
 
 
@@ -98,7 +98,7 @@ def main():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if not hasattr(module, "run"):
-        raise ValueError("La estrategia debe definir def run(ctx):")
+        raise ValueError("The strategy must define def run(ctx):")
     ctx = Context(payload)
     result = module.run(ctx)
     if result is None:
@@ -157,4 +157,4 @@ def run_strategy_subprocess(code: str, payload: dict[str, Any], timeout_seconds:
         try:
             return json.loads(stdout.splitlines()[-1])
         except (IndexError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"La estrategia no devolvio JSON valido: {stdout[:500]}") from exc
+            raise RuntimeError(f"The strategy did not return valid JSON: {stdout[:500]}") from exc

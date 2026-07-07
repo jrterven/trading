@@ -8,10 +8,9 @@ describe('format helpers', () => {
     expect(formatPercent(-4.2)).toBe('-4.20%');
   });
 
-  it('maps sentiment labels to Spanish UI labels and tones', () => {
-    expect(sentimentLabel('positive')).toBe('positivo');
-    expect(sentimentLabel('negative')).toBe('negativo');
+  it('maps sentiment labels to English UI labels and tones', () => {
+    expect(sentimentLabel('positive')).toBe('positive');
+    expect(sentimentLabel('negative')).toBe('negative');
     expect(sentimentTone('unknown')).toBe('neutral');
   });
 });
-

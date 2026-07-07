@@ -55,12 +55,49 @@ class NewsFetchDailyStats(BaseModel):
     average: float = 0.0
 
 
+class MarketDataTimeframeSummary(BaseModel):
+    timeframe: str
+    total: int = 0
+    fetched: int = 0
+    new: int = 0
+    existing: int = 0
+    failed_windows: int = 0
+
+
+class MarketDataFetchSummary(BaseModel):
+    symbol: str
+    start: datetime
+    end: datetime
+    timeframes: list[MarketDataTimeframeSummary] = Field(default_factory=list)
+
+
+class DatasetBarCoverage(BaseModel):
+    timeframe: str
+    count: int = 0
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+class DatasetSummaryRow(BaseModel):
+    symbol: str
+    news_count: int = 0
+    news_start: datetime | None = None
+    news_end: datetime | None = None
+    sentiment_count: int = 0
+    sentiment_coverage_pct: float = 0.0
+    bars: list[DatasetBarCoverage] = Field(default_factory=list)
+    has_news: bool = False
+    has_sentiment: bool = False
+    has_ohlcv: bool = False
+
+
 class NewsFetchSummary(BaseModel):
     total: int
     fetched: int
     existing: int
     new: int
     daily: NewsFetchDailyStats = Field(default_factory=NewsFetchDailyStats)
+    market_data: MarketDataFetchSummary | None = None
 
 
 class NewsFetchResponse(BaseModel):
@@ -115,7 +152,7 @@ class NewsFetchRequest(BaseModel):
     start: datetime | None = None
     end: datetime | None = None
     include_rss: bool = False
-    limit: int = Field(default=100, ge=1, le=2000)
+    limit: int = Field(default=100, ge=1, le=10000)
     relation_type: Literal["all", "direct", "indirect"] = "all"
 
 
@@ -131,7 +168,7 @@ class BacktestRequest(BaseModel):
     start: datetime
     end: datetime
     code: str
-    strategy_name: str = "Estrategia sin nombre"
+    strategy_name: str = "Untitled strategy"
     initial_cash: float = Field(default=10000, gt=0)
     commission_pct: float = Field(default=0.001, ge=0, le=0.05)
     position_size_cash: float | None = Field(default=None, gt=0)
@@ -173,7 +210,7 @@ class BacktestSummary(BaseModel):
 
 
 class StrategySaveRequest(BaseModel):
-    name: str = "Estrategia sin nombre"
+    name: str = "Untitled strategy"
     code: str
 
 

@@ -108,7 +108,7 @@ export function ChartPanel({
     windowSize: 0,
   });
   const sources = Array.from(new Set(bars.map((bar) => bar.source).filter(Boolean)));
-  const dataSource = sources.length > 1 ? 'mixed' : sources[0] ?? 'sin datos';
+  const dataSource = sources.length > 1 ? 'mixed' : sources[0] ?? 'no data';
 
   useEffect(() => {
     onNewsMarkerClickRef.current = onNewsMarkerClick;
@@ -294,11 +294,11 @@ export function ChartPanel({
     <section className="chart-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Mercado</p>
+          <p className="eyebrow">Market</p>
           <h1>{symbol}</h1>
         </div>
         <div className="price-readout">
-          <span>Ultimo</span>
+          <span>Last</span>
           <strong>{livePrice ? `$${livePrice.toFixed(2)}` : '--'}</strong>
           <small className={dataSource === 'sample' || dataSource === 'mixed' ? 'source-badge sample' : 'source-badge'}>
             {dataSource === 'sample' ? 'SAMPLE DATA' : dataSource === 'mixed' ? 'MIXED DATA' : dataSource.toUpperCase()}
@@ -310,7 +310,7 @@ export function ChartPanel({
       </div>
       <div className="chart-scrollbar">
         <input
-          aria-label="Desplazar grafica horizontalmente"
+          aria-label="Scroll chart horizontally"
           type="range"
           min="0"
           max={scrollState.maxStart}

@@ -28,6 +28,25 @@ SCHEMA = (
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS bars_unique ON bars(symbol, timeframe, timestamp)",
     """
+    CREATE TABLE IF NOT EXISTS bars_fetch_coverage (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        timeframe TEXT NOT NULL,
+        start_at TIMESTAMP NOT NULL,
+        end_at TIMESTAMP NOT NULL,
+        status TEXT NOT NULL,
+        fetched_at TIMESTAMP NOT NULL,
+        params_hash TEXT NOT NULL,
+        bar_count BIGINT NOT NULL,
+        error TEXT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS bars_fetch_coverage_lookup
+    ON bars_fetch_coverage(provider, symbol, timeframe, start_at, end_at, status)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS news_articles (
         id TEXT PRIMARY KEY,
         source TEXT NOT NULL,

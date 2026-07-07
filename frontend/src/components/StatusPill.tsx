@@ -11,7 +11,7 @@ export function StatusPill({ live, alpacaConfigured }: Props) {
       {live ? <Radio size={15} /> : <Circle size={13} />}
       <span>{live ? 'live' : 'offline'}</span>
       <span className="status-divider" />
-      <span>{alpacaConfigured ? 'Alpaca' : 'sin Alpaca'}</span>
+      <span>{alpacaConfigured ? 'Alpaca' : 'no Alpaca'}</span>
     </div>
   );
 }

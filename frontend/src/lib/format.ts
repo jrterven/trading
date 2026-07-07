@@ -20,8 +20,8 @@ export function formatPercent(value?: number | null): string {
 }
 
 export function sentimentLabel(label: string): string {
-  if (label === 'positive') return 'positivo';
-  if (label === 'negative') return 'negativo';
+  if (label === 'positive') return 'positive';
+  if (label === 'negative') return 'negative';
   return 'neutral';
 }
 
@@ -34,4 +34,3 @@ export function sentimentTone(label?: string): 'positive' | 'negative' | 'neutra
 export function toDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
-

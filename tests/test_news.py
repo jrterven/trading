@@ -6,7 +6,7 @@ import pytest
 
 from backend.config import get_settings
 from backend.providers.rss import article_mentions_symbol
-from backend.schemas import NewsArticle
+from backend.schemas import MarketDataFetchSummary, MarketDataTimeframeSummary, NewsArticle
 from backend.services.news import NewsService
 
 
@@ -14,6 +14,14 @@ def test_article_mentions_symbol_by_ticker_or_alias():
     assert article_mentions_symbol("AAPL", "Apple raises iPhone production")
     assert article_mentions_symbol("NVDA", "GPU demand remains strong")
     assert not article_mentions_symbol("TSLA", "Bank earnings preview")
+
+
+def test_news_fetch_request_allows_large_history_limit():
+    from backend.schemas import NewsFetchRequest
+
+    request = NewsFetchRequest(limit=10000)
+
+    assert request.limit == 10000
 
 
 def test_news_cache_deduplicates_articles():
@@ -62,9 +70,14 @@ async def test_news_fetch_only_downloads_missing_windows(monkeypatch):
                 )
             ]
 
+    class FakeMarketData:
+        async def fetch_and_store_range(self, symbol: str, start: datetime, end: datetime, timeframes, refresh: bool = False):
+            return MarketDataFetchSummary(symbol=symbol, start=start, end=end, timeframes=[])
+
     service = NewsService()
     fake = FakeAlpaca()
     service.alpaca = fake  # type: ignore[assignment]
+    service.market_data = FakeMarketData()  # type: ignore[assignment]
     start = datetime(2026, 1, 1, tzinfo=UTC)
 
     first = await service.fetch_and_store_with_summary("AAPL", start, start + timedelta(days=2), limit=10)
@@ -87,6 +100,56 @@ async def test_news_fetch_only_downloads_missing_windows(monkeypatch):
     assert second.summary.daily.min.count == 1
     assert second.summary.daily.min.date == "2026-01-01"
     assert second.summary.daily.average == 1.0
+    assert second.summary.market_data is not None
+
+
+@pytest.mark.asyncio
+async def test_news_fetch_reports_market_data_failures_without_blocking(monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_SECRET_KEY", "secret")
+    get_settings.cache_clear()
+
+    class FakeAlpaca:
+        async def fetch_news(self, symbol: str, start: datetime, end: datetime, limit: int):
+            return [
+                NewsArticle(
+                    id="alpaca:market-data-failure",
+                    source="alpaca",
+                    symbol=symbol,
+                    headline="Apple headline",
+                    published_at=start + timedelta(hours=1),
+                    raw_symbols=[symbol],
+                )
+            ]
+
+    class FakeMarketData:
+        async def fetch_and_store_range(self, symbol: str, start: datetime, end: datetime, timeframes, refresh: bool = False):
+            return MarketDataFetchSummary(
+                symbol=symbol,
+                start=start,
+                end=end,
+                timeframes=[
+                    MarketDataTimeframeSummary(
+                        timeframe="1Min",
+                        total=0,
+                        fetched=0,
+                        new=0,
+                        existing=0,
+                        failed_windows=1,
+                    )
+                ],
+            )
+
+    service = NewsService()
+    service.alpaca = FakeAlpaca()  # type: ignore[assignment]
+    service.market_data = FakeMarketData()  # type: ignore[assignment]
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+
+    result = await service.fetch_and_store_with_summary("AAPL", start, start + timedelta(days=1), limit=10)
+
+    assert len(result.articles) == 1
+    assert result.summary.market_data is not None
+    assert result.summary.market_data.timeframes[0].failed_windows == 1
 
 
 def test_same_article_can_link_to_multiple_symbols_with_different_relation_types():

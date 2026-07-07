@@ -16,7 +16,7 @@ class StrategyService:
     def save(self, request: StrategySaveRequest) -> StrategyRecord:
         created_at = utc_now()
         strategy_id = str(uuid.uuid4())
-        name = request.name.strip() or "Estrategia sin nombre"
+        name = request.name.strip() or "Untitled strategy"
         file_path = self._write_strategy_file(strategy_id, name, request.code)
 
         with connection(self.settings) as con:
@@ -63,7 +63,7 @@ class StrategyService:
     def _write_strategy_file(self, strategy_id: str, name: str, code: str):
         directory = self.settings.data_dir / "strategies"
         directory.mkdir(parents=True, exist_ok=True)
-        slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", name.strip().lower()).strip("-") or "estrategia"
+        slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", name.strip().lower()).strip("-") or "strategy"
         path = directory / f"{slug}-{strategy_id[:8]}.py"
         path.write_text(code, encoding="utf-8")
         return path

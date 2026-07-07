@@ -317,10 +317,10 @@ class SentimentService:
     async def _ollama_summary(self, article: NewsArticle, label: str) -> str | None:
         article_text = " ".join(str(article.summary or article.content or "").split())[:1200]
         prompt = (
-            "Resume en una frase el catalizador principal de esta noticia financiera y "
-            "di por que el sentimiento podria ser relevante para trading. "
-            f"Ticker: {article.symbol}. Sentimiento base: {label}. "
-            f"Titulo: {article.headline}. Resumen: {article_text}"
+            "Summarize in one sentence the main catalyst in this financial news item and "
+            "explain why the sentiment could be relevant for trading. "
+            f"Ticker: {article.symbol}. Base sentiment: {label}. "
+            f"Title: {article.headline}. Summary: {article_text}"
         )
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(8.0, connect=2.0)) as client:
@@ -330,7 +330,7 @@ class SentimentService:
                         "model": self.settings.ollama_model,
                         "stream": False,
                         "messages": [
-                            {"role": "system", "content": "Responde en espanol, breve y cuantitativo."},
+                            {"role": "system", "content": "Answer in English, briefly and quantitatively."},
                             {"role": "user", "content": prompt},
                         ],
                     },

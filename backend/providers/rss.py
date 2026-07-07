@@ -39,7 +39,7 @@ async def fetch_rss_news(symbol: str, feed_urls: tuple[str, ...], limit: int = 3
                 continue
             parsed = feedparser.parse(response.text)
             for entry in parsed.entries:
-                title = str(entry.get("title") or "Sin titulo")
+                title = str(entry.get("title") or "Untitled")
                 summary = _clean_summary(entry.get("summary") or entry.get("description"))
                 if not article_mentions_symbol(symbol, title, summary):
                     continue

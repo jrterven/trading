@@ -1,6 +1,7 @@
 import type {
   BacktestRun,
   Bar,
+  DatasetSummaryRow,
   NewsArticle,
   NewsFetchResponse,
   PaperPortfolio,
@@ -11,20 +12,44 @@ import type {
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
+const GET_RETRY_DELAYS_MS = [300, 800, 1500];
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `HTTP ${response.status}`);
+  const method = options?.method?.toUpperCase() ?? 'GET';
+  const canRetry = method === 'GET';
+  for (let attempt = 0; attempt <= (canRetry ? GET_RETRY_DELAYS_MS.length : 0); attempt += 1) {
+    try {
+      const response = await fetch(`${API_BASE}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+        ...options,
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<T>;
+    } catch (err) {
+      const hasRetryLeft = canRetry && attempt < GET_RETRY_DELAYS_MS.length;
+      if (hasRetryLeft) {
+        await delay(GET_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      if (err instanceof TypeError) {
+        throw new Error('Backend is still starting or unreachable. Please try again in a moment.');
+      }
+      throw err;
+    }
   }
-  return response.json() as Promise<T>;
+  throw new Error('Request failed');
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function qs(params: Record<string, string | number | boolean | undefined | null>) {
@@ -74,6 +99,7 @@ export const api = {
     }),
   sentiment: (params: { symbol: string; start?: string; end?: string }) =>
     request<SentimentScore[]>(`/api/sentiment?${qs(params)}`),
+  datasetSummary: () => request<DatasetSummaryRow[]>('/api/dataset/summary'),
   runBacktest: (body: {
     symbol: string;
     timeframe: string;

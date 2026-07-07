@@ -55,10 +55,10 @@ export function StrategyEditor({
       <div className="panel-titlebar">
         <div>
           <p className="eyebrow">Python</p>
-          <h2>Estrategia</h2>
+          <h2>Strategy</h2>
         </div>
         <div className="tool-buttons">
-          <button className="icon-button" onClick={onSave} disabled={saving} aria-label="Guardar estrategia local">
+          <button className="icon-button" onClick={onSave} disabled={saving} aria-label="Save local strategy">
             <Save size={16} />
           </button>
           <button className="primary-action" onClick={onRun} disabled={running}>
@@ -69,7 +69,7 @@ export function StrategyEditor({
       </div>
       <div className="strategy-filebar">
         <label>
-          Nombre
+          Name
           <input
             value={strategyName}
             onChange={(event) => onStrategyNameChange(event.target.value)}
@@ -77,7 +77,7 @@ export function StrategyEditor({
           />
         </label>
         <label>
-          Guardadas
+          Saved
           <select
             value=""
             onChange={(event) => {
@@ -85,7 +85,7 @@ export function StrategyEditor({
               if (selected) onLoadStrategy(selected);
             }}
           >
-            <option value="">Cargar...</option>
+            <option value="">Load...</option>
             {strategies.map((strategy) => (
               <option key={strategy.id} value={strategy.id}>
                 {strategy.name}
@@ -95,7 +95,7 @@ export function StrategyEditor({
         </label>
         {saveMessage && <span className="save-message">{saveMessage}</span>}
       </div>
-      <div className="backtest-settings" aria-label="Parametros de backtest">
+      <div className="backtest-settings" aria-label="Backtest parameters">
         <label>
           Capital
           <input
@@ -137,7 +137,7 @@ export function StrategyEditor({
           />
         </label>
         <label>
-          Comision %
+          Commission %
           <input
             type="number"
             min="0"

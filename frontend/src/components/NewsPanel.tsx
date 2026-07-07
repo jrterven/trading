@@ -114,16 +114,16 @@ export function NewsPanel({
     <section className="side-panel news-panel">
       <div className="panel-titlebar">
         <div>
-          <p className="eyebrow">Noticias</p>
-          <h2>Feed y sentimiento</h2>
+          <p className="eyebrow">News</p>
+          <h2>Feed and sentiment</h2>
         </div>
         <div className="tool-buttons">
           <button
             className="icon-button"
             onClick={onRunSentiment}
             disabled={loading}
-            aria-label="Analizar sentimiento"
-            data-tooltip="Analizar sentimiento"
+            aria-label="Analyze sentiment"
+            data-tooltip="Analyze sentiment"
           >
             <Brain size={16} />
           </button>
@@ -131,8 +131,8 @@ export function NewsPanel({
             className="icon-button"
             onClick={onFetchNews}
             disabled={loading}
-            aria-label="Generar o actualizar histórico"
-            data-tooltip="Generar/Actualizar histórico"
+            aria-label="Generate or update history"
+            data-tooltip="Generate/update history"
           >
             <DatabaseZap size={16} />
           </button>
@@ -140,7 +140,7 @@ export function NewsPanel({
         </div>
       </div>
       <div className="news-controls">
-        <div className="segmented-control" aria-label="Rango de noticias">
+        <div className="segmented-control" aria-label="News range">
           {presets.map((preset) => (
             <button
               key={preset.label}
@@ -165,7 +165,7 @@ export function NewsPanel({
             <input type="date" value={end} onChange={(event) => onEndChange(event.target.value)} />
           </label>
         </div>
-        <div className="segmented-control relation-filter" aria-label="Relacion de noticias">
+        <div className="segmented-control relation-filter" aria-label="News relation">
           {(['all', 'direct', 'indirect'] as const).map((value) => (
             <button
               key={value}
@@ -179,12 +179,12 @@ export function NewsPanel({
         </div>
         <div className="news-options-grid">
           <div className="news-option-group">
-            <span>Orden</span>
-            <div className="segmented-control news-sort-control" aria-label="Orden de noticias">
+            <span>Sort</span>
+            <div className="segmented-control news-sort-control" aria-label="News sort">
               {([
-                ['chronological', 'Cronológico'],
-                ['positive', '+ Positivo'],
-                ['negative', '+ Negativo'],
+                ['chronological', 'Chronological'],
+                ['positive', '+ Positive'],
+                ['negative', '+ Negative'],
               ] as const).map(([value, label]) => (
                 <button
                   key={value}
@@ -198,11 +198,12 @@ export function NewsPanel({
             </div>
           </div>
           <div className="news-option-group">
-            <span>Gráfica</span>
-            <div className="segmented-control news-chart-control" aria-label="Noticias en grafica">
+            <span>Chart</span>
+            <div className="segmented-control news-chart-control" aria-label="News on chart">
               {([
-                ['all', 'Todas'],
-                ['influential', 'Influyentes'],
+                ['none', 'None'],
+                ['all', 'All'],
+                ['influential', 'Influential'],
               ] as const).map(([value, label]) => (
                 <button
                   key={value}
@@ -218,13 +219,13 @@ export function NewsPanel({
         </div>
         <button className="primary-row-button" type="button" onClick={onFetchNews} disabled={loading}>
           <DatabaseZap size={15} />
-          Generar/Actualizar histórico
+          Generate/update history
         </button>
         {loading && (
-          <div className="news-progress" role="progressbar" aria-label={loadingMessage || 'Procesando noticias'}>
+          <div className="news-progress" role="progressbar" aria-label={loadingMessage || 'Processing news'}>
             <div className="news-progress-header">
-              <span>{loadingMessage || 'Procesando noticias...'}</span>
-              <strong>En curso</strong>
+              <span>{loadingMessage || 'Processing news...'}</span>
+              <strong>In progress</strong>
             </div>
             <div className="news-progress-track">
               <div className="news-progress-bar" />
@@ -232,7 +233,7 @@ export function NewsPanel({
           </div>
         )}
         {fetchSummary && (
-          <div className="news-fetch-summary" aria-label="Resumen de noticias extraidas">
+          <div className="news-fetch-summary" aria-label="Extracted news summary">
             <div className="summary-metrics">
               <span>
                 <strong>{fetchSummary.total}</strong>
@@ -240,38 +241,56 @@ export function NewsPanel({
               </span>
               <span>
                 <strong>{fetchSummary.new}</strong>
-                Nuevas
+                New
               </span>
               <span>
                 <strong>{fetchSummary.existing}</strong>
-                Ya existían
+                Existing
               </span>
               <span>
                 <strong>{fetchSummary.fetched}</strong>
-                Bajadas
+                Fetched
               </span>
             </div>
             {(fetchSummary.daily.max || fetchSummary.daily.min) && (
               <div className="summary-daily-stats">
                 {fetchSummary.daily.max && (
                   <span>
-                    Max/día
+                    Max/day
                     <strong>{fetchSummary.daily.max.count}</strong>
                     <em>{shortDate(fetchSummary.daily.max.date)}</em>
                   </span>
                 )}
                 {fetchSummary.daily.min && (
                   <span>
-                    Min/día
+                    Min/day
                     <strong>{fetchSummary.daily.min.count}</strong>
                     <em>{shortDate(fetchSummary.daily.min.date)}</em>
                   </span>
                 )}
                 <span>
-                  Prom/día
+                  Avg/day
                   <strong>{fetchSummary.daily.average.toFixed(2)}</strong>
-                  <em>rango</em>
+                  <em>range</em>
                 </span>
+              </div>
+            )}
+            {fetchSummary.market_data && fetchSummary.market_data.timeframes.length > 0 && (
+              <div className="summary-market-data" aria-label="OHLCV cache summary">
+                <div className="summary-section-title">OHLCV cache</div>
+                {fetchSummary.market_data.timeframes.map((item) => (
+                  <div
+                    key={item.timeframe}
+                    className={item.failed_windows > 0 ? 'market-data-row failed' : 'market-data-row'}
+                  >
+                    <strong>{item.timeframe}</strong>
+                    <span>Total {item.total}</span>
+                    <span>New {item.new}</span>
+                    <span>Existing {item.existing}</span>
+                    <span>Fetched {item.fetched}</span>
+                    {item.failed_windows > 0 && <em>{item.failed_windows} failed</em>}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -316,13 +335,13 @@ export function NewsPanel({
               {score?.explanation && <p className="ai-note">{score.explanation}</p>}
               {article.url && (
                 <a href={article.url} target="_blank" rel="noreferrer">
-                  <ExternalLink size={13} /> fuente
+                  <ExternalLink size={13} /> source
                 </a>
               )}
             </article>
           );
         })}
-        {news.length === 0 && <div className="empty-state">Sin noticias cargadas</div>}
+        {news.length === 0 && <div className="empty-state">No news loaded</div>}
       </div>
     </section>
   );

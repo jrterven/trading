@@ -17,7 +17,7 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
       <div className="panel-titlebar">
         <div>
           <p className="eyebrow">Backtest</p>
-          <h2>Resultados</h2>
+          <h2>Results</h2>
         </div>
         {run?.status === 'failed' ? (
           <AlertTriangle size={18} className="danger-icon" />
@@ -30,20 +30,20 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
 
       <div className="metric-grid">
         <Metric label="Equity" value={formatCurrency(metrics.final_equity)} />
-        <Metric label="Retorno" value={formatPercent(metrics.total_return_pct)} />
+        <Metric label="Return" value={formatPercent(metrics.total_return_pct)} />
         <Metric label="Buy&Hold" value={formatPercent(metrics.buy_hold_return_pct)} />
         <Metric label="Drawdown" value={formatPercent(metrics.max_drawdown_pct)} />
         <Metric label="Trades" value={formatNumber(metrics.trade_count, 0)} />
         <Metric label="Sharpe" value={formatNumber(metrics.sharpe, 3)} />
       </div>
 
-      {run?.equity_curve?.length ? <EquitySparkline run={run} /> : <div className="empty-state">Sin corrida</div>}
+      {run?.equity_curve?.length ? <EquitySparkline run={run} /> : <div className="empty-state">No run</div>}
 
       {run?.strategy_code && (
         <div className="result-actions">
           <button className="secondary-action" onClick={() => onLoadRunCode(run)}>
             <Code2 size={15} />
-            <span>Cargar codigo usado</span>
+            <span>Load used code</span>
           </button>
         </div>
       )}
@@ -56,8 +56,8 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
         <table>
           <thead>
             <tr>
-              <th>Entrada</th>
-              <th>Salida</th>
+              <th>Entry</th>
+              <th>Exit</th>
               <th>PnL</th>
             </tr>
           </thead>
@@ -78,7 +78,7 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
       <div className="history-list">
         <div className="table-heading">
           <History size={15} />
-          <span>Historial</span>
+          <span>History</span>
         </div>
         {history.map((item) => (
           <button key={item.id} className="history-row" onClick={() => onLoadRun(item.id)}>
@@ -87,11 +87,11 @@ export function ResultsPanel({ run, history, onLoadRun, onLoadRunCode }: Props) 
               {item.symbol} {item.timeframe}
             </span>
             <span className={item.status === 'completed' ? 'positive-text' : 'negative-text'}>
-              {item.status === 'completed' ? formatPercent(item.total_return_pct) : 'fallo'}
+              {item.status === 'completed' ? formatPercent(item.total_return_pct) : 'failed'}
             </span>
           </button>
         ))}
-        {history.length === 0 && <div className="empty-state">Sin historial guardado</div>}
+        {history.length === 0 && <div className="empty-state">No saved history</div>}
       </div>
     </section>
   );

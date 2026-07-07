@@ -82,6 +82,14 @@ def test_simulate_long_only_uses_position_size_and_stop_loss():
 
 @pytest.mark.asyncio
 async def test_backtest_service_runs_user_strategy_in_sandbox():
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    bars = generate_bars("AAPL", "1Day", start, start + timedelta(days=10))
+    service = BacktestService()
+
+    async def fake_get_bars(symbol: str, timeframe: str, request_start: datetime, request_end: datetime):
+        return bars
+
+    service.market_data.get_bars = fake_get_bars  # type: ignore[method-assign]
     code = """
 def run(ctx):
     n = len(ctx.candles)
@@ -92,12 +100,12 @@ def run(ctx):
         exits[3] = True
     return {"entries": entries, "exits": exits, "markers": []}
 """
-    run = await BacktestService().run(
+    run = await service.run(
         BacktestRequest(
             symbol="AAPL",
             timeframe="1Day",
-            start=datetime(2026, 1, 1, tzinfo=UTC),
-            end=datetime(2026, 2, 1, tzinfo=UTC),
+            start=start,
+            end=start + timedelta(days=10),
             code=code,
             strategy_name="sandbox test",
         )
@@ -126,7 +134,11 @@ async def test_backtest_does_not_pass_news_after_last_candle_to_strategy():
         )
         for index in range(2)
     ]
-    service.market_data.save_bars(bars)
+
+    async def fake_get_bars(symbol: str, timeframe: str, request_start: datetime, request_end: datetime):
+        return bars
+
+    service.market_data.get_bars = fake_get_bars  # type: ignore[method-assign]
     service.news.save_articles(
         [
             NewsArticle(

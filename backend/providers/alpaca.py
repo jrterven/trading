@@ -77,13 +77,23 @@ class AlpacaProvider:
             "feed": self.settings.alpaca_data_feed,
             "limit": str(limit),
         }
+        bars: list[Bar] = []
+        page_token: str | None = None
         async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(url, headers=self.headers, params=params)
-        if response.status_code >= 400:
-            raise ProviderError(f"Alpaca bars error {response.status_code}: {response.text[:240]}")
-        payload = response.json()
-        raw_bars = payload.get("bars", {}).get(symbol.upper(), [])
-        return [self._bar_from_alpaca(symbol.upper(), timeframe, raw) for raw in raw_bars]
+            for _ in range(100):
+                page_params = dict(params)
+                if page_token:
+                    page_params["page_token"] = page_token
+                response = await client.get(url, headers=self.headers, params=page_params)
+                if response.status_code >= 400:
+                    raise ProviderError(f"Alpaca bars error {response.status_code}: {response.text[:240]}")
+                payload = response.json()
+                raw_bars = payload.get("bars", {}).get(symbol.upper(), [])
+                bars.extend(self._bar_from_alpaca(symbol.upper(), timeframe, raw) for raw in raw_bars)
+                page_token = payload.get("next_page_token")
+                if not page_token:
+                    break
+        return bars
 
     async def fetch_news(
         self,
@@ -195,7 +205,7 @@ class AlpacaProvider:
             id=f"alpaca:{article_id}",
             source="alpaca",
             symbol=symbol,
-            headline=str(raw.get("headline") or "Sin titulo"),
+            headline=str(raw.get("headline") or "Untitled"),
             summary=raw.get("summary"),
             url=url,
             author=raw.get("author"),

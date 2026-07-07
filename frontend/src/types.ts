@@ -46,11 +46,48 @@ export interface NewsFetchSummary {
     min?: { date: string; count: number } | null;
     average: number;
   };
+  market_data?: MarketDataFetchSummary | null;
 }
 
 export interface NewsFetchResponse {
   articles: NewsArticle[];
   summary: NewsFetchSummary;
+}
+
+export interface MarketDataTimeframeSummary {
+  timeframe: string;
+  total: number;
+  fetched: number;
+  new: number;
+  existing: number;
+  failed_windows: number;
+}
+
+export interface MarketDataFetchSummary {
+  symbol: string;
+  start: string;
+  end: string;
+  timeframes: MarketDataTimeframeSummary[];
+}
+
+export interface DatasetBarCoverage {
+  timeframe: string;
+  count: number;
+  start?: string | null;
+  end?: string | null;
+}
+
+export interface DatasetSummaryRow {
+  symbol: string;
+  news_count: number;
+  news_start?: string | null;
+  news_end?: string | null;
+  sentiment_count: number;
+  sentiment_coverage_pct: number;
+  bars: DatasetBarCoverage[];
+  has_news: boolean;
+  has_sentiment: boolean;
+  has_ohlcv: boolean;
 }
 
 export interface SentimentScore {
@@ -70,7 +107,7 @@ export interface SentimentScore {
 }
 
 export type NewsSortMode = 'chronological' | 'positive' | 'negative';
-export type NewsChartMode = 'all' | 'influential';
+export type NewsChartMode = 'none' | 'all' | 'influential';
 
 export interface NewsChartMarker {
   article_id: string;

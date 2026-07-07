@@ -19,6 +19,7 @@ from .schemas import (
     StrategySaveRequest,
 )
 from .services.backtesting import BacktestService
+from .services.dataset import DatasetService
 from .services.market_data import MarketDataService
 from .services.news import NewsService
 from .services.paper import PaperService
@@ -88,7 +89,7 @@ def get_news(
     symbol: str = "AAPL",
     start: str | None = None,
     end: str | None = None,
-    limit: int = Query(default=100, ge=1, le=2000),
+    limit: int = Query(default=100, ge=1, le=10000),
     relation_type: str = Query(default="all", pattern="^(all|direct|indirect)$"),
 ) -> list[dict]:
     service = NewsService(settings)
@@ -140,6 +141,12 @@ def get_sentiment(
         end=parse_datetime(end, None) if end else None,
     )
     return [score.model_dump(mode="json") for score in scores]
+
+
+@app.get("/api/dataset/summary")
+def get_dataset_summary() -> list[dict]:
+    service = DatasetService(settings)
+    return [row.model_dump(mode="json") for row in service.summary()]
 
 
 @app.post("/api/backtests")

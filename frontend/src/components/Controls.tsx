@@ -132,7 +132,7 @@ export function Controls({
         <div className="symbol-search">
           <Search size={15} />
           <input
-            aria-label="Buscar ticker"
+            aria-label="Search ticker"
             placeholder="NVDA, Microsoft"
             value={symbolQuery}
             onChange={(event) => setSymbolQuery(event.target.value)}
@@ -156,7 +156,7 @@ export function Controls({
       </div>
 
       <div className="field-group">
-        <label>Tiempo</label>
+        <label>Timeframe</label>
         <select value={timeframe} onChange={(event) => onTimeframeChange(event.target.value)}>
           {timeframes.map((item) => (
             <option key={item}>{item}</option>
@@ -164,7 +164,7 @@ export function Controls({
         </select>
       </div>
 
-      <div className="segmented" aria-label="Rangos">
+      <div className="segmented" aria-label="Ranges">
         <button onClick={() => onPreset(30)}>30D</button>
         <button onClick={() => onPreset(90)}>90D</button>
         <button onClick={() => onYearPreset(1)}>1Y</button>
@@ -193,7 +193,7 @@ export function Controls({
 
       <button className="primary-action" onClick={onRefresh} disabled={loading}>
         <RefreshCw size={16} className={loading ? 'spin' : ''} />
-        <span>Actualizar</span>
+        <span>Refresh</span>
       </button>
     </div>
   );

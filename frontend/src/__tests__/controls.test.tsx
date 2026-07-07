@@ -55,7 +55,7 @@ describe('Controls', () => {
 
     render(<Controls {...baseProps} />);
 
-    fireEvent.change(screen.getByLabelText('Buscar ticker'), { target: { value: 'Microsoft' } });
+    fireEvent.change(screen.getByLabelText('Search ticker'), { target: { value: 'Microsoft' } });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('q=Microsoft'), expect.anything()));
     await waitFor(() =>

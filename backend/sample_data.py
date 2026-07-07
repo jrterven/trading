@@ -131,24 +131,24 @@ def generate_news(symbol: str, limit: int = 12) -> list[NewsArticle]:
     now = utc_now()
     templates = [
         (
-            "{company} reporta crecimiento de ingresos y eleva expectativas",
-            "La compania destaco demanda resiliente y mejora en margenes operativos.",
+            "{company} reports revenue growth and raises expectations",
+            "The company highlighted resilient demand and improving operating margins.",
         ),
         (
-            "Analistas revisan precio objetivo de {company} antes de resultados",
-            "El mercado observa flujo de caja, guidance y presion competitiva.",
+            "Analysts revise {company} price target ahead of earnings",
+            "The market is watching cash flow, guidance, and competitive pressure.",
         ),
         (
-            "{company} enfrenta presion por costos y cambios regulatorios",
-            "Inversionistas evalúan el impacto potencial en utilidades futuras.",
+            "{company} faces cost pressure and regulatory changes",
+            "Investors are assessing the potential impact on future earnings.",
         ),
         (
-            "{company} anuncia nueva alianza estrategica",
-            "La noticia podria abrir oportunidades de expansion en nuevos segmentos.",
+            "{company} announces new strategic partnership",
+            "The news could open expansion opportunities in new segments.",
         ),
         (
-            "Volumen inusual en {symbol} durante la sesion",
-            "Operadores atribuyen el movimiento a noticias recientes y rebalanceos.",
+            "Unusual volume in {symbol} during the session",
+            "Traders attribute the move to recent news and rebalancing.",
         ),
     ]
     articles: list[NewsArticle] = []
@@ -178,4 +178,3 @@ def default_date_window(days: int = 180) -> tuple[datetime, datetime]:
     end = datetime.now(tz=UTC)
     start = end - timedelta(days=days)
     return start, end
-

@@ -376,7 +376,7 @@ select:focus {
 
 .workspace-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   background: #edf3f0;
   border-bottom: 1px solid #cdd8d3;
 }
@@ -387,7 +387,7 @@ select:focus {
   border-right: 1px solid #cdd8d3;
   background: transparent;
   color: #586965;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 780;
   text-transform: uppercase;
 }
@@ -877,6 +877,191 @@ select:focus {
   font-style: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.summary-market-data {
+  display: grid;
+  gap: 5px;
+}
+
+.summary-section-title {
+  color: #5a6965;
+  font-size: 10px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.market-data-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 52px repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  align-items: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: #eef5f2;
+  color: #5a6965;
+  font-size: 10px;
+  font-weight: 740;
+}
+
+.market-data-row strong {
+  color: #153f3a;
+  font-size: 11px;
+}
+
+.market-data-row span,
+.market-data-row em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-data-row em {
+  grid-column: 1 / -1;
+  color: #b45309;
+  font-style: normal;
+}
+
+.market-data-row.failed {
+  background: #fff7ed;
+}
+
+.dataset-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.dataset-toolbar {
+  padding: 10px 12px;
+  border-bottom: 1px solid #dbe4df;
+}
+
+.dataset-toolbar label {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid #cddbd6;
+  border-radius: 7px;
+  background: #fbfdfb;
+  color: #697a76;
+}
+
+.dataset-toolbar input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #24302d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.dataset-table-wrap {
+  min-height: 0;
+  overflow: auto;
+}
+
+.dataset-table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.dataset-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 7px;
+  border-bottom: 1px solid #cdd8d3;
+  background: #edf3f0;
+  color: #586965;
+  font-size: 10px;
+  font-weight: 820;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dataset-table td {
+  padding: 8px 7px;
+  border-bottom: 1px solid #dbe4df;
+  vertical-align: top;
+}
+
+.dataset-table tbody tr {
+  cursor: pointer;
+}
+
+.dataset-table tbody tr:hover {
+  background: #eef8f5;
+}
+
+.dataset-symbol {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dataset-symbol strong {
+  color: #153f3a;
+  font-size: 12px;
+}
+
+.dataset-status {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #d7f5eb;
+  color: #08745f;
+  font-size: 9px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.dataset-status.partial {
+  background: #fff1bd;
+  color: #7c5d00;
+}
+
+.dataset-status.missing {
+  background: #eef2ef;
+  color: #6a7975;
+}
+
+.dataset-cell {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.dataset-cell strong {
+  color: #153f3a;
+  font-size: 12px;
+}
+
+.dataset-cell em {
+  overflow: hidden;
+  color: #697a76;
+  font-size: 10px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataset-cell.partial strong {
+  color: #9a6500;
 }
 
 .news-list {

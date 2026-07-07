@@ -8,8 +8,16 @@ from typing import Any, Literal
 from ..config import Settings, get_settings
 from ..db import as_utc_naive, connection, rows_to_dicts
 from ..providers.alpaca import AlpacaProvider, ProviderError
-from ..schemas import NewsArticle, NewsFetchDailyStats, NewsFetchDayCount, NewsFetchResponse, NewsFetchSummary
+from ..schemas import (
+    MarketDataFetchSummary,
+    NewsArticle,
+    NewsFetchDailyStats,
+    NewsFetchDayCount,
+    NewsFetchResponse,
+    NewsFetchSummary,
+)
 from ..time_utils import ensure_utc, utc_now
+from .market_data import DEFAULT_HISTORICAL_TIMEFRAMES, MarketDataService
 
 RelationFilter = Literal["all", "direct", "indirect"]
 
@@ -54,6 +62,7 @@ class NewsService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.alpaca = AlpacaProvider(self.settings)
+        self.market_data = MarketDataService(self.settings)
 
     async def fetch_and_store(
         self,
@@ -114,6 +123,12 @@ class NewsService:
             except ProviderError as exc:
                 self._save_coverage(symbol, window_start, window_end, "failed", 0, str(exc))
 
+        market_data = await self.market_data.fetch_and_store_range(
+            symbol=symbol,
+            start=start,
+            end=end,
+            timeframes=DEFAULT_HISTORICAL_TIMEFRAMES,
+        )
         articles = self.get_articles(
             symbol,
             start=start,
@@ -123,7 +138,15 @@ class NewsService:
         )
         return NewsFetchResponse(
             articles=articles,
-            summary=self._build_summary(symbol, start, end, articles, fetched=fetched, new=new),
+            summary=self._build_summary(
+                symbol,
+                start,
+                end,
+                articles,
+                fetched=fetched,
+                new=new,
+                market_data=market_data,
+            ),
         )
 
     def get_articles(
@@ -270,6 +293,7 @@ class NewsService:
         articles: list[NewsArticle],
         fetched: int,
         new: int,
+        market_data: MarketDataFetchSummary | None = None,
     ) -> NewsFetchSummary:
         total = self.count_articles(symbol, start, end)
         daily = self._daily_stats(start, end, self.count_articles_by_day(symbol, start, end))
@@ -280,6 +304,7 @@ class NewsService:
             existing=existing,
             new=new,
             daily=daily,
+            market_data=market_data,
         )
 
     def count_articles(self, symbol: str, start: datetime, end: datetime) -> int:
