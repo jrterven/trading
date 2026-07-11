@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ResultsPanel } from '../components/ResultsPanel';
@@ -78,6 +78,51 @@ describe('strategy runtime UI', () => {
     fireEvent.change(screen.getByLabelText('Examples'), { target: { value: 'rsi' } });
 
     expect(onLoadExample).toHaveBeenCalledWith(expect.objectContaining({ name: 'RSI mean reversion' }));
+  });
+
+  it('loads a local Python strategy file into the editor', async () => {
+    const onChange = vi.fn();
+    const onStrategyNameChange = vi.fn();
+    const source = 'import pandas as pd\n\n\ndef run(ctx):\n    return {"entries": [], "exits": []}\n';
+
+    render(
+      <StrategyEditor
+        strategyName="New strategy"
+        code=""
+        running={false}
+        saving={false}
+        strategies={[]}
+        examples={[]}
+        initialCash={10000}
+        positionSizeCash={1000}
+        stopLossPct={5}
+        takeProfitPct={10}
+        commissionPct={0.1}
+        timeoutSeconds={8}
+        environment={environment}
+        onStrategyNameChange={onStrategyNameChange}
+        onChange={onChange}
+        onRun={vi.fn()}
+        onSave={vi.fn()}
+        onLoadStrategy={vi.fn()}
+        onLoadExample={vi.fn()}
+        onInitialCashChange={vi.fn()}
+        onPositionSizeCashChange={vi.fn()}
+        onStopLossPctChange={vi.fn()}
+        onTakeProfitPctChange={vi.fn()}
+        onCommissionPctChange={vi.fn()}
+        onTimeoutSecondsChange={vi.fn()}
+      />,
+    );
+
+    const file = new File([source], 'my_strategy.py', { type: 'text/x-python' });
+    Object.defineProperty(file, 'text', { value: vi.fn().mockResolvedValue(source) });
+    const input = screen.getByLabelText('Load Python file') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(source));
+    expect(onStrategyNameChange).toHaveBeenCalledWith('my_strategy');
   });
 
   it('shows backtest logs and debug output', () => {

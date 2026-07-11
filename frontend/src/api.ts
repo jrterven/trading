@@ -10,6 +10,7 @@ import type {
   StrategyRecord,
   StrategyEnvironment,
   SymbolResult,
+  AssetClass,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -65,13 +66,15 @@ function qs(params: Record<string, string | number | boolean | undefined | null>
 
 export const api = {
   health: () => request<{ status: string; alpaca_configured: boolean }>('/api/health'),
-  searchSymbols: (q: string) => request<SymbolResult[]>(`/api/symbols/search?${qs({ q })}`),
+  searchSymbols: (q: string, asset_class: AssetClass = 'stock') =>
+    request<SymbolResult[]>(`/api/symbols/search?${qs({ q, asset_class })}`),
   bars: (params: {
     symbol: string;
     timeframe: string;
     start: string;
     end: string;
     refresh?: boolean;
+    asset_class?: AssetClass;
   }) => request<Bar[]>(`/api/bars?${qs(params)}`),
   news: (params: {
     symbol: string;
@@ -79,10 +82,12 @@ export const api = {
     end?: string;
     limit?: number;
     relation_type?: 'all' | 'direct' | 'indirect';
+    asset_class?: AssetClass;
   }) =>
     request<NewsArticle[]>(`/api/news?${qs(params)}`),
   fetchNews: (body: {
     symbol: string;
+    asset_class?: AssetClass;
     start?: string;
     end?: string;
     include_rss: boolean;
@@ -93,14 +98,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  runSentiment: (body: { symbol: string; article_ids?: string[]; use_ollama: boolean }) =>
+  runSentiment: (body: { symbol: string; asset_class?: AssetClass; article_ids?: string[]; use_ollama: boolean }) =>
     request<SentimentScore[]>('/api/sentiment/run', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  sentiment: (params: { symbol: string; start?: string; end?: string }) =>
+  sentiment: (params: { symbol: string; start?: string; end?: string; asset_class?: AssetClass }) =>
     request<SentimentScore[]>(`/api/sentiment?${qs(params)}`),
-  datasetSummary: () => request<DatasetSummaryRow[]>('/api/dataset/summary'),
+  datasetSummary: (asset_class: AssetClass = 'stock') =>
+    request<DatasetSummaryRow[]>(`/api/dataset/summary?${qs({ asset_class })}`),
   strategyEnvironment: () => request<StrategyEnvironment>('/api/strategy/environment'),
   runBacktest: (body: {
     symbol: string;

@@ -21,6 +21,7 @@ import { defaultStrategy } from './defaultStrategy';
 import { toDateInput } from './lib/format';
 import { strategyExamples, type StrategyExample } from './strategyExamples';
 import type {
+  AssetClass,
   BacktestRun,
   BacktestSummary,
   Bar,
@@ -57,6 +58,10 @@ function initialEnd() {
 type WorkspaceTab = 'news' | 'results' | 'strategy' | 'portfolio' | 'dataset';
 type NewsRelationFilter = 'all' | 'direct' | 'indirect';
 
+const DEFAULT_SYMBOL_BY_ASSET: Record<AssetClass, string> = {
+  stock: 'AAPL',
+  crypto: 'BTC/USD',
+};
 const NEWS_FEED_LIMIT = 10000;
 const INFLUENTIAL_NEWS_LIMIT = 12;
 const RIGHT_RAIL_STORAGE_KEY = 'trading-lab-right-rail-width';
@@ -84,7 +89,8 @@ function initialRightRailWidth() {
 }
 
 export default function App() {
-  const [symbol, setSymbol] = useState('AAPL');
+  const [assetClass, setAssetClass] = useState<AssetClass>('stock');
+  const [symbol, setSymbol] = useState(DEFAULT_SYMBOL_BY_ASSET.stock);
   const [timeframe, setTimeframe] = useState('1Day');
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
@@ -197,6 +203,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    loadDatasetSummary();
+  }, [assetClass]);
+
+  useEffect(() => {
     try {
       window.localStorage.setItem(RIGHT_RAIL_STORAGE_KEY, String(rightRailWidth));
     } catch {
@@ -234,13 +244,17 @@ export default function App() {
 
   useEffect(() => {
     loadMarket(false);
-  }, [symbol, timeframe, start, end]);
+  }, [assetClass, symbol, timeframe, start, end]);
 
   useEffect(() => {
     loadNewsCache();
-  }, [symbol, newsStart, newsEnd, newsRelationFilter]);
+  }, [assetClass, symbol, newsStart, newsEnd, newsRelationFilter]);
 
   useEffect(() => {
+    if (assetClass !== 'stock') {
+      setLive(false);
+      return;
+    }
     const socket = new WebSocket(`${webSocketBaseUrl()}/ws/market/${symbol}?timeframe=1Min`);
     socket.onopen = () => setLive(true);
     socket.onclose = () => setLive(false);
@@ -254,18 +268,19 @@ export default function App() {
       });
     };
     return () => socket.close();
-  }, [symbol, timeframe]);
+  }, [assetClass, symbol, timeframe]);
 
   async function loadMarket(refresh: boolean) {
     setLoading(true);
     setError(null);
     try {
-      const [nextBars, nextPortfolio] = await Promise.all([
-        api.bars({ symbol, timeframe, start, end, refresh }),
-        api.portfolio(),
-      ]);
+      const nextBars = await api.bars({ symbol, timeframe, start, end, refresh, asset_class: assetClass });
       setBars(nextBars);
-      setPortfolio(nextPortfolio);
+      if (assetClass === 'stock') {
+        setPortfolio(await api.portfolio());
+      } else {
+        setPortfolio(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error loading data');
     } finally {
@@ -285,8 +300,9 @@ export default function App() {
           end: newsEnd,
           limit: NEWS_FEED_LIMIT,
           relation_type: newsRelationFilter,
+          asset_class: assetClass,
         }),
-        api.sentiment({ symbol, start: newsStart, end: newsEnd }),
+        api.sentiment({ symbol, start: newsStart, end: newsEnd, asset_class: assetClass }),
       ]);
       setNews(nextNews);
       setSelectedNewsId(null);
@@ -302,11 +318,16 @@ export default function App() {
 
   async function fetchNews() {
     setNewsLoading(true);
-    setNewsLoadingMessage('Processing news, sentiment, and OHLCV history...');
+    setNewsLoadingMessage(
+      assetClass === 'crypto'
+        ? 'Loading local crypto news, sentiment, and OHLCV history...'
+        : 'Processing news, sentiment, and OHLCV history...',
+    );
     setError(null);
     try {
       const result = await api.fetchNews({
         symbol,
+        asset_class: assetClass,
         start: newsStart,
         end: newsEnd,
         include_rss: false,
@@ -317,13 +338,19 @@ export default function App() {
       setNews(articles);
       setSelectedNewsId(null);
       setNewsFetchSummary(result.summary);
-      const existingScores = await api.sentiment({ symbol, start: newsStart, end: newsEnd });
+      const existingScores = await api.sentiment({ symbol, start: newsStart, end: newsEnd, asset_class: assetClass });
+      if (assetClass === 'crypto') {
+        setSentiment(existingScores);
+        loadDatasetSummary();
+        return;
+      }
       const existingScoreIds = new Set(existingScores.map((score) => score.article_id));
       const articlesToScore = articles.filter((article) => !existingScoreIds.has(article.id));
       if (articlesToScore.length) {
         setNewsLoadingMessage(`Analyzing sentiment (${articlesToScore.length} pending)...`);
         const scores = await api.runSentiment({
           symbol,
+          asset_class: assetClass,
           article_ids: articlesToScore.map((article) => article.id),
           use_ollama: false,
         });
@@ -347,14 +374,19 @@ export default function App() {
 
   async function runSentiment() {
     setNewsLoading(true);
-    setNewsLoadingMessage('Analyzing sentiment...');
+    setNewsLoadingMessage(assetClass === 'crypto' ? 'Loading saved crypto sentiment...' : 'Analyzing sentiment...');
     setError(null);
     try {
+      if (assetClass === 'crypto') {
+        setSentiment(await api.sentiment({ symbol, start: newsStart, end: newsEnd, asset_class: assetClass }));
+        return;
+      }
       const articles = news.length
         ? news
         : (
             await api.fetchNews({
               symbol,
+              asset_class: assetClass,
               start: newsStart,
               end: newsEnd,
               include_rss: false,
@@ -363,7 +395,7 @@ export default function App() {
             })
           ).articles;
       setNews(articles);
-      const existingScores = await api.sentiment({ symbol, start: newsStart, end: newsEnd });
+      const existingScores = await api.sentiment({ symbol, start: newsStart, end: newsEnd, asset_class: assetClass });
       const existingScoreIds = new Set(existingScores.map((score) => score.article_id));
       const articlesToScore = articles.filter((article) => !existingScoreIds.has(article.id));
       if (!articlesToScore.length) {
@@ -372,6 +404,7 @@ export default function App() {
       }
       const scores = await api.runSentiment({
         symbol,
+        asset_class: assetClass,
         article_ids: articlesToScore.map((article) => article.id),
         use_ollama: false,
       });
@@ -389,6 +422,10 @@ export default function App() {
   }
 
   async function runBacktest() {
+    if (assetClass === 'crypto') {
+      setError('Crypto backtesting is not wired yet. Use the chart, news, sentiment, and Dataset views for crypto for now.');
+      return;
+    }
     setRunning(true);
     setError(null);
     try {
@@ -461,7 +498,7 @@ export default function App() {
     setDatasetLoading(true);
     setError(null);
     try {
-      setDatasetRows(await api.datasetSummary());
+      setDatasetRows(await api.datasetSummary(assetClass));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error loading dataset summary');
     } finally {
@@ -483,6 +520,7 @@ export default function App() {
     setError(null);
     try {
       const run = await api.backtest(id);
+      setAssetClass('stock');
       setSymbol(run.symbol);
       setTimeframe(run.timeframe);
       setStart(toDateInput(new Date(run.start_at)));
@@ -544,6 +582,25 @@ export default function App() {
     setSymbol(nextSymbol);
   }
 
+  function handleAssetClassChange(nextAssetClass: AssetClass) {
+    if (nextAssetClass === assetClass) return;
+    const nextSymbol = DEFAULT_SYMBOL_BY_ASSET[nextAssetClass];
+    setAssetClass(nextAssetClass);
+    setSymbol(nextSymbol);
+    setBars([]);
+    setNews([]);
+    setSentiment([]);
+    setNewsFetchSummary(null);
+    setSelectedNewsId(null);
+    setBacktest(null);
+    setPortfolio(null);
+    setStart(initialStart());
+    setEnd(initialEnd());
+    setNewsStart(initialStart());
+    setNewsEnd(initialEnd());
+    setError(null);
+  }
+
   function setPreset(days: number) {
     setStart(toDateInput(new Date(Date.now() - days * 24 * 60 * 60 * 1000)));
     setEnd(initialEnd());
@@ -568,6 +625,7 @@ export default function App() {
           </div>
         </div>
         <Controls
+          assetClass={assetClass}
           symbol={symbol}
           timeframe={timeframe}
           start={start}
@@ -580,6 +638,7 @@ export default function App() {
           onRefresh={() => loadMarket(true)}
           onPreset={setPreset}
           onYearPreset={setYearPreset}
+          onAssetClassChange={handleAssetClassChange}
         />
         <StatusPill live={live} alpacaConfigured={alpacaConfigured} />
       </header>
@@ -632,6 +691,7 @@ export default function App() {
           <div className="tab-content">
             {activeTab === 'news' && (
               <NewsPanel
+                assetClass={assetClass}
                 news={sortedNews}
                 fetchSummary={newsFetchSummary}
                 sentiment={sentiment}
@@ -696,6 +756,7 @@ export default function App() {
             {activeTab === 'dataset' && (
               <DatasetPanel
                 rows={datasetRows}
+                assetClass={assetClass}
                 loading={datasetLoading}
                 onRefresh={loadDatasetSummary}
                 onSelectSymbol={selectDatasetSymbol}

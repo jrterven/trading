@@ -90,10 +90,42 @@ button {
 }
 
 .symbol-control,
-.field-group {
+.field-group,
+.asset-control {
   position: relative;
   display: grid;
   gap: 5px;
+}
+
+.asset-toggle {
+  height: 34px;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #b8c7c1;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.asset-toggle button {
+  min-width: 72px;
+  border: 0;
+  border-right: 1px solid #d8e0dd;
+  background: transparent;
+  color: #31413f;
+  font-weight: 780;
+}
+
+.asset-toggle button:last-child {
+  border-right: 0;
+}
+
+.asset-toggle button:hover {
+  background: #ecf4f1;
+}
+
+.asset-toggle button.active {
+  background: #14453e;
+  color: #ffffff;
 }
 
 label,
@@ -238,6 +270,21 @@ select:focus {
   position: relative;
   width: 34px;
   padding: 0;
+}
+
+.file-button {
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: none;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .icon-button[data-tooltip]::after {

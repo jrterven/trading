@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+AssetClass = Literal["stock", "crypto"]
+
 
 class SymbolResult(BaseModel):
     symbol: str
@@ -21,7 +23,7 @@ class Bar(BaseModel):
     high: float
     low: float
     close: float
-    volume: int
+    volume: float
     source: str = "alpaca"
 
 
@@ -149,6 +151,7 @@ class Trade(BaseModel):
 
 class NewsFetchRequest(BaseModel):
     symbol: str = "AAPL"
+    asset_class: AssetClass = "stock"
     start: datetime | None = None
     end: datetime | None = None
     include_rss: bool = False
@@ -158,6 +161,7 @@ class NewsFetchRequest(BaseModel):
 
 class SentimentRunRequest(BaseModel):
     symbol: str
+    asset_class: AssetClass = "stock"
     article_ids: list[str] | None = None
     use_ollama: bool = False
 

@@ -1,5 +1,6 @@
 import Editor from '@monaco-editor/react';
-import { Cpu, Play, Save } from 'lucide-react';
+import { Cpu, Play, Save, Upload } from 'lucide-react';
+import type { ChangeEvent } from 'react';
 
 import type { StrategyExample } from '../strategyExamples';
 import type { StrategyEnvironment, StrategyRecord } from '../types';
@@ -66,6 +67,19 @@ export function StrategyEditor({
     return `${name}:${info?.installed ? info.version ?? 'yes' : 'no'}`;
   });
 
+  async function loadStrategyFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+    if (!file.name.toLowerCase().endsWith('.py')) return;
+
+    const source = await file.text();
+    const strategyNameFromFile = file.name.replace(/\.py$/i, '').trim();
+    onChange(source);
+    if (strategyNameFromFile) onStrategyNameChange(strategyNameFromFile);
+  }
+
   return (
     <section className="editor-panel">
       <div className="panel-titlebar">
@@ -74,6 +88,15 @@ export function StrategyEditor({
           <h2>Strategy script</h2>
         </div>
         <div className="tool-buttons">
+          <label className="icon-button file-button" data-tooltip="Load .py file">
+            <Upload size={16} />
+            <input
+              type="file"
+              accept=".py,text/x-python,text/plain"
+              aria-label="Load Python file"
+              onChange={loadStrategyFile}
+            />
+          </label>
           <button className="icon-button" onClick={onSave} disabled={saving} aria-label="Save local strategy">
             <Save size={16} />
           </button>

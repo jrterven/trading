@@ -2,9 +2,10 @@ import { Brain, CalendarDays, DatabaseZap, ExternalLink, RefreshCw } from 'lucid
 import { useEffect, useRef } from 'react';
 
 import { formatPercent, sentimentLabel, sentimentTone } from '../lib/format';
-import type { NewsArticle, NewsChartMode, NewsFetchSummary, NewsSortMode, SentimentScore } from '../types';
+import type { AssetClass, NewsArticle, NewsChartMode, NewsFetchSummary, NewsSortMode, SentimentScore } from '../types';
 
 interface Props {
+  assetClass: AssetClass;
   news: NewsArticle[];
   fetchSummary: NewsFetchSummary | null;
   sentiment: SentimentScore[];
@@ -68,6 +69,7 @@ function shortDate(date: string) {
 }
 
 export function NewsPanel({
+  assetClass,
   news,
   fetchSummary,
   sentiment,
@@ -91,6 +93,8 @@ export function NewsPanel({
   const articleRefs = useRef(new Map<string, HTMLElement>());
   const sentimentByArticle = new Map(sentiment.map((score) => [score.article_id, score]));
   const selectedPreset = activePreset(start, end);
+  const historyActionLabel = assetClass === 'crypto' ? 'Refresh local crypto history' : 'Generate/update history';
+  const sentimentActionLabel = assetClass === 'crypto' ? 'Load saved sentiment' : 'Analyze sentiment';
   const setPreset = (days: number | null) => {
     const now = new Date();
     if (days === null) {
@@ -122,8 +126,8 @@ export function NewsPanel({
             className="icon-button"
             onClick={onRunSentiment}
             disabled={loading}
-            aria-label="Analyze sentiment"
-            data-tooltip="Analyze sentiment"
+            aria-label={sentimentActionLabel}
+            data-tooltip={sentimentActionLabel}
           >
             <Brain size={16} />
           </button>
@@ -131,8 +135,8 @@ export function NewsPanel({
             className="icon-button"
             onClick={onFetchNews}
             disabled={loading}
-            aria-label="Generate or update history"
-            data-tooltip="Generate/update history"
+            aria-label={historyActionLabel}
+            data-tooltip={historyActionLabel}
           >
             <DatabaseZap size={16} />
           </button>
@@ -219,7 +223,7 @@ export function NewsPanel({
         </div>
         <button className="primary-row-button" type="button" onClick={onFetchNews} disabled={loading}>
           <DatabaseZap size={15} />
-          Generate/update history
+          {historyActionLabel}
         </button>
         {loading && (
           <div className="news-progress" role="progressbar" aria-label={loadingMessage || 'Processing news'}>

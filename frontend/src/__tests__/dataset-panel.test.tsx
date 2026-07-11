@@ -39,12 +39,20 @@ describe('DatasetPanel', () => {
   it('filters rows and selects a symbol', () => {
     const onSelectSymbol = vi.fn();
 
-    render(<DatasetPanel rows={rows} loading={false} onRefresh={vi.fn()} onSelectSymbol={onSelectSymbol} />);
+    render(
+      <DatasetPanel
+        rows={rows}
+        assetClass="stock"
+        loading={false}
+        onRefresh={vi.fn()}
+        onSelectSymbol={onSelectSymbol}
+      />,
+    );
 
     expect(screen.getByText('AAPL')).toBeInTheDocument();
     expect(screen.getByText('MSFT')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Filter dataset by ticker'), { target: { value: 'MS' } });
+    fireEvent.change(screen.getByLabelText('Filter dataset by symbol'), { target: { value: 'MS' } });
 
     expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('MSFT'));
@@ -53,7 +61,7 @@ describe('DatasetPanel', () => {
   });
 
   it('shows an empty state', () => {
-    render(<DatasetPanel rows={[]} loading={false} onRefresh={vi.fn()} onSelectSymbol={vi.fn()} />);
+    render(<DatasetPanel rows={[]} assetClass="stock" loading={false} onRefresh={vi.fn()} onSelectSymbol={vi.fn()} />);
 
     expect(screen.getByText('No local dataset coverage')).toBeInTheDocument();
   });

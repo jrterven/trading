@@ -1,10 +1,11 @@
 import { Database, RefreshCw, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import type { DatasetBarCoverage, DatasetSummaryRow } from '../types';
+import type { AssetClass, DatasetBarCoverage, DatasetSummaryRow } from '../types';
 
 interface Props {
   rows: DatasetSummaryRow[];
+  assetClass: AssetClass;
   loading: boolean;
   onRefresh: () => void;
   onSelectSymbol: (symbol: string) => void;
@@ -41,7 +42,7 @@ function sentimentCoverageText(row: DatasetSummaryRow) {
   return `${row.sentiment_count}/${row.news_count} scored`;
 }
 
-export function DatasetPanel({ rows, loading, onRefresh, onSelectSymbol }: Props) {
+export function DatasetPanel({ rows, assetClass, loading, onRefresh, onSelectSymbol }: Props) {
   const [query, setQuery] = useState('');
   const filteredRows = useMemo(() => {
     const needle = query.trim().toUpperCase();
@@ -54,7 +55,7 @@ export function DatasetPanel({ rows, loading, onRefresh, onSelectSymbol }: Props
       <div className="panel-titlebar">
         <div>
           <p className="eyebrow">Dataset</p>
-          <h2>Local coverage</h2>
+          <h2>{assetClass === 'crypto' ? 'Local crypto coverage' : 'Local stock coverage'}</h2>
         </div>
         <button
           className="icon-button"
@@ -72,8 +73,8 @@ export function DatasetPanel({ rows, loading, onRefresh, onSelectSymbol }: Props
         <label>
           <Search size={14} />
           <input
-            aria-label="Filter dataset by ticker"
-            placeholder="Filter ticker"
+            aria-label="Filter dataset by symbol"
+            placeholder="Filter symbol"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -90,7 +91,7 @@ export function DatasetPanel({ rows, loading, onRefresh, onSelectSymbol }: Props
           <table className="dataset-table">
             <thead>
               <tr>
-                <th>Ticker</th>
+                <th>Symbol</th>
                 <th>News</th>
                 <th>Sentiment</th>
                 {timeframes.map((timeframe) => (

@@ -5,6 +5,8 @@ export interface SymbolResult {
   tradable: boolean;
 }
 
+export type AssetClass = 'stock' | 'crypto';
+
 export interface Bar {
   symbol: string;
   timeframe: string;

@@ -18,6 +18,9 @@ from .sandbox import StrategyExecutionError, run_strategy_subprocess, strategy_e
 from .sentiment import SentimentService
 
 
+STRATEGY_NEWS_LIMIT = 10_000
+
+
 class BacktestService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -33,7 +36,12 @@ class BacktestService:
             request.symbol, request.timeframe, request.start, request.end
         )
         effective_end = max((bar.timestamp for bar in bars), default=request.end)
-        articles = self.news.get_articles(request.symbol, request.start, effective_end, limit=100)
+        articles = self.news.get_articles(
+            request.symbol,
+            request.start,
+            effective_end,
+            limit=STRATEGY_NEWS_LIMIT,
+        )
         scores = self.sentiment.get_scores(request.symbol, start=request.start, end=effective_end)
         payload = {
             "symbol": request.symbol.upper(),

@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { api } from '../api';
 import { toDateInput } from '../lib/format';
-import type { SymbolResult } from '../types';
+import type { AssetClass, SymbolResult } from '../types';
 
 interface Props {
+  assetClass: AssetClass;
   symbol: string;
   timeframe: string;
   start: string;
@@ -18,6 +19,7 @@ interface Props {
   onRefresh: () => void;
   onPreset: (days: number) => void;
   onYearPreset: (years: number) => void;
+  onAssetClassChange: (assetClass: AssetClass) => void;
 }
 
 const timeframes = ['1Min', '5Min', '15Min', '1Hour', '1Day'];
@@ -36,6 +38,16 @@ const popularSymbols: SymbolResult[] = [
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSEARCA', tradable: true },
   { symbol: 'QQQ', name: 'Invesco QQQ Trust', exchange: 'NASDAQ', tradable: true },
 ];
+const popularCryptoSymbols: SymbolResult[] = [
+  { symbol: 'BTC/USD', name: 'Bitcoin / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'ETH/USD', name: 'Ethereum / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'SOL/USD', name: 'Solana / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'XRP/USD', name: 'XRP / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'DOGE/USD', name: 'Dogecoin / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'ADA/USD', name: 'Cardano / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'AVAX/USD', name: 'Avalanche / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+  { symbol: 'LINK/USD', name: 'Chainlink / US Dollar', exchange: 'Alpaca Crypto', tradable: true },
+];
 
 function mergeSymbols(items: SymbolResult[]) {
   const seen = new Set<string>();
@@ -46,10 +58,14 @@ function mergeSymbols(items: SymbolResult[]) {
   });
 }
 
-function marketDateBounds() {
+function marketDateBounds(assetClass: AssetClass) {
   const max = new Date();
   const min = new Date(max);
-  min.setFullYear(min.getFullYear() - 9);
+  if (assetClass === 'crypto') {
+    min.setFullYear(2021, 0, 1);
+  } else {
+    min.setFullYear(min.getFullYear() - 9);
+  }
   return {
     min: toDateInput(min),
     max: toDateInput(max),
@@ -57,6 +73,7 @@ function marketDateBounds() {
 }
 
 export function Controls({
+  assetClass,
   symbol,
   timeframe,
   start,
@@ -69,16 +86,23 @@ export function Controls({
   onRefresh,
   onPreset,
   onYearPreset,
+  onAssetClassChange,
 }: Props) {
   const [symbolQuery, setSymbolQuery] = useState('');
-  const [symbolOptions, setSymbolOptions] = useState<SymbolResult[]>(popularSymbols);
-  const dateBounds = useMemo(() => marketDateBounds(), []);
+  const popularOptions = assetClass === 'crypto' ? popularCryptoSymbols : popularSymbols;
+  const [symbolOptions, setSymbolOptions] = useState<SymbolResult[]>(popularOptions);
+  const dateBounds = useMemo(() => marketDateBounds(assetClass), [assetClass]);
+
+  useEffect(() => {
+    setSymbolQuery('');
+    setSymbolOptions(popularOptions);
+  }, [assetClass, popularOptions]);
 
   useEffect(() => {
     let cancelled = false;
     const query = symbolQuery.trim();
     if (query.length < 2) {
-      setSymbolOptions(popularSymbols);
+      setSymbolOptions(popularOptions);
       return () => {
         cancelled = true;
       };
@@ -86,12 +110,12 @@ export function Controls({
 
     const timer = window.setTimeout(() => {
       api
-        .searchSymbols(query)
+        .searchSymbols(query, assetClass)
         .then((matches) => {
-          if (!cancelled) setSymbolOptions(matches.length ? matches : popularSymbols);
+          if (!cancelled) setSymbolOptions(matches.length ? matches : popularOptions);
         })
         .catch(() => {
-          if (!cancelled) setSymbolOptions(popularSymbols);
+          if (!cancelled) setSymbolOptions(popularOptions);
         });
     }, 250);
 
@@ -99,24 +123,24 @@ export function Controls({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [symbolQuery]);
+  }, [assetClass, popularOptions, symbolQuery]);
 
   useEffect(() => {
     let cancelled = false;
     api
-      .searchSymbols(symbol)
+      .searchSymbols(symbol, assetClass)
       .then((matches) => {
         if (!cancelled && matches.length) {
           setSymbolOptions((current) => mergeSymbols([...matches, ...current]));
         }
       })
       .catch(() => {
-        if (!cancelled) setSymbolOptions(popularSymbols);
+        if (!cancelled) setSymbolOptions(popularOptions);
       });
     return () => {
       cancelled = true;
     };
-  }, [symbol]);
+  }, [assetClass, popularOptions, symbol]);
 
   const dropdownOptions = useMemo(() => {
     const options = symbolOptions.some((item) => item.symbol === symbol)
@@ -127,13 +151,32 @@ export function Controls({
 
   return (
     <div className="control-strip">
+      <div className="asset-control">
+        <label>Asset</label>
+        <div className="asset-toggle" role="group" aria-label="Asset class">
+          <button
+            type="button"
+            className={assetClass === 'stock' ? 'active' : ''}
+            onClick={() => onAssetClassChange('stock')}
+          >
+            Stocks
+          </button>
+          <button
+            type="button"
+            className={assetClass === 'crypto' ? 'active' : ''}
+            onClick={() => onAssetClassChange('crypto')}
+          >
+            Crypto
+          </button>
+        </div>
+      </div>
       <div className="symbol-control">
-        <label htmlFor="symbol-select">Ticker</label>
+        <label htmlFor="symbol-select">Symbol</label>
         <div className="symbol-search">
           <Search size={15} />
           <input
-            aria-label="Search ticker"
-            placeholder="NVDA, Microsoft"
+            aria-label="Search symbol"
+            placeholder={assetClass === 'crypto' ? 'BTC, Ethereum' : 'NVDA, Microsoft'}
             value={symbolQuery}
             onChange={(event) => setSymbolQuery(event.target.value)}
           />

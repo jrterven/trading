@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Controls } from '../components/Controls';
 
 const baseProps = {
+  assetClass: 'stock' as const,
   symbol: 'AAPL',
   timeframe: '1Day',
   start: '2026-01-01',
@@ -16,6 +17,7 @@ const baseProps = {
   onRefresh: vi.fn(),
   onPreset: vi.fn(),
   onYearPreset: vi.fn(),
+  onAssetClassChange: vi.fn(),
 };
 
 describe('Controls', () => {
@@ -40,7 +42,7 @@ describe('Controls', () => {
 
     await waitFor(() => expect(screen.getByRole('option', { name: 'AAPL - Apple Inc.' })).toBeInTheDocument());
     expect(screen.getByRole('option', { name: 'NVDA - NVIDIA Corporation' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Ticker'), { target: { value: 'MSFT' } });
+    fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'MSFT' } });
 
     expect(screen.getByRole('option', { name: 'MSFT - Microsoft Corporation' })).toBeInTheDocument();
     expect(onSymbolChange).toHaveBeenCalledWith('MSFT');
@@ -55,7 +57,7 @@ describe('Controls', () => {
 
     render(<Controls {...baseProps} />);
 
-    fireEvent.change(screen.getByLabelText('Search ticker'), { target: { value: 'Microsoft' } });
+    fireEvent.change(screen.getByLabelText('Search symbol'), { target: { value: 'Microsoft' } });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('q=Microsoft'), expect.anything()));
     await waitFor(() =>
