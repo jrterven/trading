@@ -2,11 +2,53 @@
 
 The two public files are ordinary, self-contained DuckDB databases. You can download just one, move it to any directory, and read it with DuckDB without installing Trading Lab, configuring `.env`, calling Alpaca, or downloading a sentiment model.
 
-- **[Public download folder](https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX)**: `trading.duckdb` (stocks/ETFs) and `crypto.duckdb` (cryptocurrencies).
-- **[Download, unzip, and quick start](../README.md#public-datasets)**: snapshot sizes, counts, date ranges, and installation instructions.
+- <a href="https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX" target="_blank" rel="noopener noreferrer"><strong>Public download folder ↗</strong></a>: `trading.duckdb` (stocks/ETFs) and `crypto.duckdb` (cryptocurrencies).
+- **[Download, unzip, and quick start](#download-and-open-the-data-independently)**: snapshot sizes, counts, date ranges, and installation instructions.
 - **[Standalone inspection/export script](../scripts/read_dataset.py)**: copy this single file alongside your databases; its only dependency is `duckdb`.
 
 Examples below assume the downloaded files are in your current directory. Inside the repository, their usual locations are `data/trading.duckdb` and `data/crypto/crypto.duckdb`. `DUCKDB_PATH` configures the application's stock database; direct DuckDB connections and the standalone script use the path you supply.
+
+## Download and open the data independently
+
+On GitHub, use **Cmd + click** (macOS) or **Ctrl + click** (Windows/Linux) to open the download in another tab. GitHub removes the link’s `target` attribute; compatible HTML viewers honor it.
+
+1. Open the <a href="https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX" target="_blank" rel="noopener noreferrer">public pCloud folder ↗</a> and download either file or the whole folder. The individual `.duckdb` files are ready to open; they do not need decompression or an import step.
+2. If you download the folder as a ZIP, extract it with your archive manager, or run the command below with your actual ZIP filename. Keep enough disk space for the archive and the extracted databases (about 8.19 GiB combined), plus any exports.
+
+   ```bash
+   python3 -m zipfile -e Trading.zip ./datasets
+   ```
+
+3. Locate `trading.duckdb` and `crypto.duckdb` inside the extracted folder. They can live anywhere; replace the paths in the examples with their actual locations.
+4. Create a small Python environment. The standalone examples and script use only `duckdb` (tested with Python 3.12 and DuckDB 1.5.4):
+
+   ```bash
+   python3 -m venv .venv-data
+   source .venv-data/bin/activate
+   # Windows PowerShell: .venv-data\Scripts\Activate.ps1
+   python -m pip install duckdb==1.5.4
+   ```
+
+Save this as `example.py` next to your downloaded `crypto.duckdb`, then run `python example.py`:
+
+```python
+import duckdb
+
+with duckdb.connect("crypto.duckdb", read_only=True) as con:
+    print(con.execute("SHOW TABLES").fetchall())
+    rows = con.execute("""
+        SELECT timestamp, open, high, low, close, volume
+        FROM bars
+        WHERE symbol = ? AND timeframe = ?
+          AND timestamp >= ? AND timestamp < ?
+        ORDER BY timestamp
+        LIMIT 10
+    """, ["BTC/USD", "1Day", "2025-01-01", "2026-01-01"]).fetchall()
+    for row in rows:
+        print(row)
+```
+
+For stocks, use `trading.duckdb` and a ticker such as `AAPL`. Timestamps are stored as timezone-naive UTC. The example uses an inclusive start and exclusive end. No repository clone is needed for this example.
 
 ## Connect without the application
 

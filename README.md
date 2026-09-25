@@ -1,18 +1,154 @@
 # Trading Lab
 
-Local web platform for researching trading strategies on US stocks/ETFs with candlestick data, company news, sentiment analysis, Python strategy code, and backtesting.
+**A local workspace for market research, news sentiment, and Python strategy experiments.**
 
-The historical stock/ETF and cryptocurrency datasets are also available as standalone downloads. You can query them with SQL or Python and export them to CSV or Parquet without installing or running Trading Lab.
+Explore stock/ETF and cryptocurrency candles, connect price moves with news, write a strategy, and inspect its backtest in one browser workspace. Historical data lives in DuckDB and can also be used independently of the platform.
 
-## Public Datasets
+[Quick start](#quick-start) · [Platform tour](docs/PLATFORM_GUIDE.md) · [First backtest](#run-your-first-backtest) · [Public datasets](#public-datasets) · [Strategy contract](docs/STRATEGY_SCRIPT_README.md)
 
-**[Download trading.duckdb and crypto.duckdb from pCloud](https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX).**
+![Trading Lab showing AAPL daily candles, volume, news markers, and article sentiment](docs/images/platform-overview.png)
 
-Each file is a self-contained DuckDB database with OHLCV candles (open, high, low, close, volume), news articles, article-to-symbol relationships, precomputed FinBERT sentiment, and download coverage records. Reading the downloaded data requires no Alpaca account, API keys, backend, frontend, or model downloads.
+*The running application on localhost, using saved AAPL data. The chart and news feed have independent date ranges.*
+
+## Explore the platform
+
+The chart stays on the left while the right panel switches between research tools. Drag the divider to make more room for news, code, or results.
+
+| Workspace | What you can do |
+| --- | --- |
+| **Market chart** | Switch between Stocks and Crypto, select a symbol and timeframe, navigate candlesticks and volume, and inspect news and trade markers. |
+| **News** | Read saved articles, filter direct/indirect relationships, sort by sentiment, and show news on the chart. Generate/update stock history through Alpaca. |
+| **Strategy** | Edit Python in Monaco, load a `.py` file, choose a built-in example, save locally, and configure capital, position size, stops, commission, and timeout. |
+| **Results** | Inspect equity, return, buy-and-hold comparison, drawdown, trade count, Sharpe, the equity curve, trades, logs, and saved runs. Reload the exact code used by a run. |
+| **Dataset** | Check per-symbol news, sentiment, and candle coverage across all five timeframes before choosing a research window. |
+| **Portfolio** | View Alpaca account balances/positions and submit manual orders to the configured trading endpoint, which defaults to Alpaca Paper Trading. |
+
+**Current scope:** stock/ETF research includes local backtesting. Crypto supports charts, saved news/sentiment, and coverage inspection; crypto backtesting and portfolio integration are not wired yet. Backtests run locally and do not place broker orders.
+
+See the **[illustrated platform guide](docs/PLATFORM_GUIDE.md)** for every panel, exact controls, and troubleshooting.
+
+## Quick start
+
+### 1. Install the environment
+
+Use Python 3.12 or 3.13 and Node.js/npm. The supplied Conda environment installs Python 3.12 and Node.js 24:
+
+```bash
+git clone https://github.com/jrterven/trading.git
+cd trading
+cp .env.example .env
+conda env create -f environment.yml
+conda activate trading-lab
+npm install
+```
+
+If you already have a `.env`, keep it and update the needed values rather than replacing it.
+
+<details>
+<summary>Prefer a Python virtual environment?</summary>
+
+With Python and Node.js already installed:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
+npm install
+```
+
+Use the manual startup commands below; `start_services.sh` requires Conda.
+
+</details>
+
+### 2. Add data and optional provider access
+
+Download the [public datasets](#public-datasets) and place them here before starting the app:
+
+```text
+data/
+├── trading.duckdb          # stocks and ETFs
+└── crypto/
+    └── crypto.duckdb       # cryptocurrencies
+```
+
+The stock database path is configurable with `DUCKDB_PATH` in `.env`. Crypto uses `data/crypto/crypto.duckdb`.
+
+To download fresh stock data, search provider symbols, or use the portfolio, set `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` in `.env`. The default stock feed is `iex`; the trading endpoint defaults to `https://paper-api.alpaca.markets`. Saved datasets can be inspected without credentials. The stock workspace may show an Alpaca configuration message when it also tries to load the portfolio; see [offline use](docs/PLATFORM_GUIDE.md#using-saved-data-without-alpaca).
+
+### 3. Start the app
+
+```bash
+./scripts/start_services.sh
+```
+
+Open **[Trading Lab on localhost](http://127.0.0.1:5173)**. The backend runs on port `8001`; interactive API documentation is at **[localhost:8001/docs](http://127.0.0.1:8001/docs)**.
+
+```bash
+# Stop both services.
+./scripts/stop_services.sh
+
+# Optional port overrides; use the same values when stopping.
+BACKEND_PORT=8002 FRONTEND_PORT=5174 ./scripts/start_services.sh
+BACKEND_PORT=8002 FRONTEND_PORT=5174 ./scripts/stop_services.sh
+```
+
+<details>
+<summary>Manual startup and logs</summary>
+
+Activate your Conda or virtual environment in terminal 1:
+
+```bash
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001
+```
+
+In terminal 2 (macOS/Linux):
+
+```bash
+VITE_API_URL=http://127.0.0.1:8001 VITE_WS_URL=ws://127.0.0.1:8001 npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+The explicit API/WS URLs are important: Vite's fallback proxy points to port `8000`. For PowerShell, set these two environment variables with `$env:VITE_API_URL` and `$env:VITE_WS_URL` before running `npm run dev`.
+
+The service scripts write logs to `.run/logs/backend.log` and `.run/logs/frontend.log`. Manual servers stop with Ctrl+C in each terminal.
+
+</details>
+
+## Run your first backtest
+
+1. Select **Stocks → AAPL → 1Day**. Set the top date range to **2025-01-01 → 2025-07-01**, which is present in the public snapshot.
+2. Open **News** to inspect context. Its date range is independent; the screenshot uses **2025-06-20 → 2025-07-01**. Choose **Influential** to show a small set of sentiment-ranked news markers.
+3. Open **Strategy**, choose **SMA crossover** from **Examples**, and inspect `run(ctx)`. The example uses 10- and 25-candle moving averages. The initial **Template** intentionally opens no trades.
+4. Set **Capital = 10000**, **Trade $ = 10000**, **Stop % = 10**, **Take % = 0**, **Commission % = 0.1**, and **Timeout (s) = 8**, then click **Backtest**.
+5. Read **Results**. Expand **Logs / Debug**, inspect the trades, and use **Load used code** to continue editing the exact strategy used in that run.
+
+![Python strategy editor with the SMA crossover code and configurable backtest parameters](docs/images/strategy-editor.png)
+
+*Load an example, upload your own `.py` script, or write directly in the editor. The runtime panel shows the actual Python environment and installed packages.*
+
+![Completed AAPL backtest with entry and exit markers, performance metrics, equity curve, debug output, and trades](docs/images/backtest-results.png)
+
+*An actual local run on the selected historical window: 122 candles and 3 trades. This screenshot documents the workflow and its observed result.*
+
+Built-in examples include SMA/EMA crossover, RSI and Bollinger mean reversion, MACD momentum, Donchian breakout, and sentiment-filtered SMA. For the `run(ctx)` interface, time-aware news access, markers, and debugging, see the **[strategy script contract](docs/STRATEGY_SCRIPT_README.md)**.
+
+## Research cryptocurrencies
+
+Choose **Crypto**, select a pair such as **BTC/USD**, and set dates within its downloaded history. Use the same chart, News, and Dataset panels. **Refresh local crypto history** and **Load saved sentiment** read the local snapshot; they do not fetch new crypto history or run a new model.
+
+[See the Bitcoin workspace and step-by-step crypto guide →](docs/PLATFORM_GUIDE.md#research-crypto)
+
+## Public datasets
+
+<a href="https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX" target="_blank" rel="noopener noreferrer"><strong>Download trading.duckdb and crypto.duckdb from pCloud ↗</strong></a>
+
+**Stay in the repository:** on GitHub, use **Cmd + click** (macOS) or **Ctrl + click** (Windows/Linux) to open the download in another tab. GitHub removes `target="_blank"` from rendered README links; the attribute works in compatible HTML viewers.
+
+Each file is a self-contained DuckDB database of OHLCV candles, news, article-to-symbol links, precomputed FinBERT sentiment, and download logs. You can use either file without installing the app or obtaining API keys.
 
 ### What is in each file?
 
-Inventory checked on **2026-09-25** against the local files; pCloud reports the same filenames and byte sizes. Counts describe this snapshot, not a live feed. Date ranges below are global first/last dates in UTC, **not a guarantee of complete coverage for every symbol or timeframe**.
+Inventory checked on **2026-09-25** against the local files; pCloud reports matching filenames and byte sizes. Date ranges are global first/last dates in UTC, not complete coverage for every symbol/timeframe.
 
 | Content | `trading.duckdb` | `crypto.duckdb` |
 | --- | --- | --- |
@@ -28,175 +164,44 @@ Inventory checked on **2026-09-25** against the local files; pCloud reports the 
 | Candle schema differences | Integer `volume` (`BIGINT`) | Fractional `volume` (`DOUBLE`), plus `trade_count` and `vwap` |
 | Other tables | Empty app tables: `strategies`, `backtest_runs`, `trades`, `markers`, `paper_orders` | No app tables |
 
-Both datasets were collected through Alpaca. Candle `source` is `alpaca`; news `source` is `alpaca` in the stock file and `benzinga` in the crypto file. News counts are unique articles; links and sentiment are per article/symbol, so one article can contribute multiple records.
+Both datasets were collected through Alpaca. Coverage varies: CVX candles end in August 2017, some crypto pairs start in 2026, and stock download logs include failed windows. The [data guide](docs/DATABASE_USAGE.md) explains sources, table definitions, joins, and actual coverage.
 
-Coverage varies substantially: CVX candles end in August 2017, while some crypto pairs only begin in 2026. Stock download logs include failed windows. Use the coverage query/script below before choosing a research period. See the [data guide](docs/DATABASE_USAGE.md) for all symbols, table definitions, joins, and timestamp conventions.
+### Use the files independently
 
-### Download and open the data independently
-
-1. Open the [public pCloud folder](https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX) and download either file or the whole folder. The individual `.duckdb` files are ready to open; they do not need decompression or an import step.
-2. If you download the folder as a ZIP, extract it with your archive manager, or run the command below with your actual ZIP filename. Keep enough disk space for the archive and the extracted databases (about 8.19 GiB combined), plus any exports.
-
-   ```bash
-   python3 -m zipfile -e Trading.zip ./datasets
-   ```
-
-3. Locate `trading.duckdb` and `crypto.duckdb` inside the extracted folder. They can live anywhere; replace the paths in the examples with their actual locations.
-4. Create a small Python environment. The standalone examples and script use only `duckdb` (tested with Python 3.12 and DuckDB 1.5.4):
-
-   ```bash
-   python3 -m venv .venv-data
-   source .venv-data/bin/activate
-   # Windows PowerShell: .venv-data\Scripts\Activate.ps1
-   python -m pip install duckdb==1.5.4
-   ```
-
-Save this as `example.py` next to your downloaded `crypto.duckdb`, then run `python example.py`:
-
-```python
-import duckdb
-
-with duckdb.connect("crypto.duckdb", read_only=True) as con:
-    print(con.execute("SHOW TABLES").fetchall())
-    rows = con.execute("""
-        SELECT timestamp, open, high, low, close, volume
-        FROM bars
-        WHERE symbol = ? AND timeframe = ?
-          AND timestamp >= ? AND timestamp < ?
-        ORDER BY timestamp
-        LIMIT 10
-    """, ["BTC/USD", "1Day", "2025-01-01", "2026-01-01"]).fetchall()
-    for row in rows:
-        print(row)
-```
-
-For stocks, use `trading.duckdb` and a ticker such as `AAPL`. Timestamps are stored as timezone-naive UTC. The example uses an inclusive start and exclusive end. No repository clone is needed for this example.
-
-### Inspect and extract to CSV or Parquet
-
-Download or copy just [`scripts/read_dataset.py`](scripts/read_dataset.py) into your working folder. It runs independently with the same single dependency and opens the source database read-only. These examples assume the script and databases are in the current directory:
+1. Download one or both `.duckdb` files. They open directly. If you download the folder as ZIP, [extract the archive first](docs/DATABASE_USAGE.md#download-and-open-the-data-independently).
+2. Install just DuckDB: `python -m pip install duckdb==1.5.4`.
+3. Copy [`read_dataset.py`](scripts/read_dataset.py) into your data directory to inspect or export the files:
 
 ```bash
-# List every table, its row count, and column types.
-python read_dataset.py --db trading.duckdb inspect
-
-# Also show the actual first/last candle and row count for each symbol/timeframe.
 python read_dataset.py --db crypto.duckdb inspect --coverage
-
-# Extract an entire table without loading it into a Python DataFrame.
 python read_dataset.py --db trading.duckdb export \
   --table news_articles --output exports/stock_news.parquet
-
-# Extract a selected series to CSV. Keep the slash in crypto symbols.
-python read_dataset.py --db crypto.duckdb export \
-  --sql "SELECT * FROM bars WHERE symbol = 'BTC/USD' AND timeframe = '1Day' AND timestamp >= '2025-01-01' AND timestamp < '2026-01-01' ORDER BY timestamp" \
-  --output exports/btc_daily_2025.csv
 ```
 
-The extension selects CSV (with a header) or Zstandard-compressed Parquet. The script creates output directories and refuses to overwrite existing files. Parquet preserves column types and is usually much smaller than CSV; neither pandas nor PyArrow is required for these exports. Prefer filtered queries for the large `bars` tables. If you cloned this repository, use `python scripts/read_dataset.py` with `--db data/trading.duckdb` or `--db data/crypto/crypto.duckdb` instead.
+**[Complete standalone data guide →](docs/DATABASE_USAGE.md)** — download/unzip instructions, Python and SQL examples, CSV/Parquet export, all symbols, and time alignment for ML.
 
-For direct SQL exports, full-database extraction, and news/sentiment joins, see [Using the datasets](docs/DATABASE_USAGE.md).
+## Architecture and optional tools
 
-## Stack
+| Layer | Implementation |
+| --- | --- |
+| Browser workspace | React, TypeScript, Vite, Lightweight Charts, Monaco Editor |
+| API and storage | FastAPI, DuckDB, pandas, NumPy |
+| Market/news provider | Alpaca; saved crypto data is read from its separate DuckDB file |
+| Strategy execution | Python subprocess with a configurable timeout; local long-only simulation |
+| Sentiment | Optional FinBERT; the public snapshots already contain scores |
+| Broker integration | Alpaca trading API; paper endpoint by default |
 
-- Backend: FastAPI, DuckDB, pandas/numpy, Alpaca market data and trading APIs.
-- Frontend: React, TypeScript, Vite, Lightweight Charts, Monaco Editor.
-- Local AI: optional FinBERT with `pip install -e ".[ai]"`; optional Ollama for news summaries.
-- Backtesting: local long-only signal engine using `entries/exits`, executed in a subprocess with a timeout.
-- Paper trading: Alpaca Paper Trading API. Backtests do not place paper or live orders.
+For local FinBERT, install `python -m pip install -e ".[ai]"`. Optional Ollama support is configured with `OLLAMA_BASE_URL` and `OLLAMA_MODEL`; the default model can be downloaded with `ollama pull gpt-oss:20b`. The standard UI sentiment action does not request Ollama explanations. Strategies that need vectorbt can use the optional `.[backtest]` extra.
 
-## Setup
-
-```bash
-cp .env.example .env
-conda env create -f environment.yml
-conda activate trading-lab
-npm install
+```text
+frontend/src/components/    Chart, news, editor, results, dataset, portfolio
+backend/main.py             HTTP API and market WebSocket
+backend/services/          Data access, sentiment, strategy execution, backtesting
+scripts/                   Startup, history downloads, standalone exports
+samples/strategies/        Example strategy scripts
 ```
 
-For local FinBERT:
-
-```bash
-conda activate trading-lab
-pip install -e ".[ai]"
-```
-
-For Ollama:
-
-```bash
-ollama pull gpt-oss:20b
-```
-
-## Run
-
-Recommended:
-
-```bash
-./scripts/start_services.sh
-```
-
-Open `http://127.0.0.1:5173`.
-
-To stop the backend and frontend:
-
-```bash
-./scripts/stop_services.sh
-```
-
-The scripts default to `CONDA_ENV=trading-lab`, backend port `8001`, and frontend port `5173`.
-You can override them like this:
-
-```bash
-BACKEND_PORT=8002 FRONTEND_PORT=5174 ./scripts/start_services.sh
-```
-
-Manual mode, terminal 1:
-
-```bash
-conda activate trading-lab
-uvicorn backend.main:app --reload --host 127.0.0.1 --port 8001
-```
-
-Terminal 2:
-
-```bash
-conda activate trading-lab
-VITE_API_URL=http://127.0.0.1:8001 VITE_WS_URL=ws://127.0.0.1:8001 npm run dev -- --host 127.0.0.1 --port 5173
-```
-
-If the backend runs on a different port:
-
-```bash
-VITE_API_URL=http://127.0.0.1:8001 VITE_WS_URL=ws://127.0.0.1:8001 npm run dev
-```
-
-The app uses Alpaca data only. Without `ALPACA_API_KEY` and `ALPACA_SECRET_KEY`, market/news endpoints do not generate mock data.
-
-## Local Database
-
-Trading Lab stores stock/ETF data in `data/trading.duckdb` by default (overridable with `DUCKDB_PATH`) and crypto data in `data/crypto/crypto.duckdb`. To use the downloads in the app, place each file at the corresponding path before starting the services. For standalone use, the files can stay anywhere; see [Public Datasets](#public-datasets) and the [data guide](docs/DATABASE_USAGE.md).
-
-## Strategy Contract
-
-The editor expects a `run(ctx)` function:
-
-```python
-def run(ctx):
-    candles = ctx.candles
-    close = candles["close"]
-    fast = close.rolling(10).mean()
-    slow = close.rolling(25).mean()
-
-    entries = (fast > slow) & (fast.shift(1) <= slow.shift(1))
-    exits = (fast < slow) & (fast.shift(1) >= slow.shift(1))
-
-    return {"entries": entries, "exits": exits, "markers": []}
-```
-
-`ctx.candles` is a DataFrame with `timestamp`, `open`, `high`, `low`, `close`, and `volume`.
-`ctx.news` contains news articles, and `ctx.sentiment` is a DataFrame with article-level sentiment scores.
-
-## Tests
+## Development
 
 ```bash
 conda activate trading-lab
@@ -205,8 +210,10 @@ npm test
 npm run build
 ```
 
-To update the environment after changes to `environment.yml`:
+After changing the Conda environment definition:
 
 ```bash
 conda env update -f environment.yml --prune
 ```
+
+**Documentation:** [Platform guide](docs/PLATFORM_GUIDE.md) · [Dataset guide](docs/DATABASE_USAGE.md) · [Strategy contract](docs/STRATEGY_SCRIPT_README.md)
