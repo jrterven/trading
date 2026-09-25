@@ -142,8 +142,6 @@ Choose **Crypto**, select a pair such as **BTC/USD**, and set dates within its d
 
 <a href="https://u.pcloud.link/publink/show?code=kZH4n4JZxvPDaHEN5CmTdmEonWGArQ6XpozX" target="_blank" rel="noopener noreferrer"><strong>Download trading.duckdb and crypto.duckdb from pCloud ↗</strong></a>
 
-**Stay in the repository:** on GitHub, use **Cmd + click** (macOS) or **Ctrl + click** (Windows/Linux) to open the download in another tab. GitHub removes `target="_blank"` from rendered README links; the attribute works in compatible HTML viewers.
-
 Each file is a self-contained DuckDB database of OHLCV candles, news, article-to-symbol links, precomputed FinBERT sentiment, and download logs. You can use either file without installing the app or obtaining API keys.
 
 ### What is in each file?
